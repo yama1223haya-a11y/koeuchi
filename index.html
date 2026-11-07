@@ -95,6 +95,20 @@ details summary{padding-block:4px}
 .view .wave{min-height:96px}
 .wave{display:block;width:100%;height:110px;border-radius:10px;background:var(--sunken)}
 .rate label{font-weight:700}
+.pickers{display:flex;flex-direction:column;gap:8px}
+.pick{display:grid;grid-template-columns:5.2em minmax(0,1fr);gap:8px;align-items:center}
+.pick-label{font-size:14px;font-weight:700}
+.seg3{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--sunken);border-radius:10px;padding:3px}
+.seg3 button{border:0;background:transparent;color:var(--muted);font:inherit;font-size:14px;font-weight:700;padding:7px 2px;border-radius:8px;cursor:pointer}
+.seg3 button[aria-pressed="true"]{background:var(--surface);color:var(--accent);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.guide{font-family:var(--f-body);font-weight:700;font-size:clamp(18px,4.6vw,24px);line-height:1.7;padding:4px 2px;min-height:1.7em;overflow-wrap:anywhere}
+.guide span{color:var(--muted);transition:color .06s}
+.guide span.done{color:var(--ink)}
+.guide span.on{color:var(--accent);text-decoration:underline;text-underline-offset:5px;text-decoration-thickness:3px}
+.guide .count{font-family:var(--f-display);font-size:40px;color:var(--rec)}
+.check{border-radius:10px;padding:10px 12px;background:var(--sunken);display:flex;flex-direction:column;gap:6px;font-size:14px}
+.check .ok{color:var(--ok);font-weight:700}
+.check .warn{color:var(--warn);font-weight:700}
 .rate-presets .chip{padding:4px 12px;font-size:13px}
 .rate-presets .chip[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);font-weight:700}
 .monitor{position:fixed;left:0;right:0;bottom:0;z-index:15;display:flex;align-items:center;gap:10px;background:var(--surface);border-top:1px solid var(--line);padding:8px max(16px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));box-shadow:0 -4px 16px rgba(0,0,0,.12)}
@@ -139,6 +153,7 @@ details summary{padding-block:4px}
       <button class="btn small" id="clearBtn">消す</button>
       <span class="note" id="fxBadge"></span>
     </div>
+    <div class="pick"><span class="pick-label">話し方</span><div class="seg3" id="speakToneSeg"><button data-tone="normal">ふつう</button><button data-tone="bright">明るく</button><button data-tone="calm">落ち着いて</button></div></div>
     <div class="ctrl rate"><label for="rate">読む速さ</label><input type="range" id="rate" min="0.6" max="3" step="0.05"><output id="rateOut"></output></div>
     <div class="row rate-presets"><button class="chip" data-rate="1">ゆっくり</button><button class="chip" data-rate="1.4">ふつう</button><button class="chip" data-rate="1.9">はやい</button><button class="chip" data-rate="2.5">早口</button></div>
     <div class="agent">
@@ -149,6 +164,7 @@ details summary{padding-block:4px}
     <div class="screen" id="screen" aria-live="polite"></div>
     <canvas class="wave" id="wave" hidden aria-label="しゃべった音の波形"></canvas>
     <div class="status" id="speakStatus"></div>
+    <p class="note" id="useInfo"></p>
   </div>
   <div class="panel">
     <h2>よく使う言葉 <small>タップで入力、長押しで削除</small></h2>
@@ -171,7 +187,12 @@ details summary{padding-block:4px}
       <button class="btn small" id="skipBtn">とばす</button>
     </div>
     <div id="phraseHead" class="row" hidden><input type="text" id="phraseIn" placeholder="例:おはよう、ありがとう" aria-label="登録する言葉(ひらがな)" style="flex:1;min-width:0"><button class="btn" id="phraseSel">決定</button></div>
+    <div class="pickers" id="pickers">
+      <div class="pick"><span class="pick-label">読む速さ</span><div class="seg3" id="paceSeg"><button data-pace="slow">ゆっくり</button><button data-pace="normal">ふつう</button><button data-pace="fast">はやめ</button></div></div>
+      <div class="pick"><span class="pick-label">話し方</span><div class="seg3" id="toneSeg"><button data-tone="normal">ふつう</button><button data-tone="bright">明るく</button><button data-tone="calm">落ち着いて</button></div></div>
+    </div>
     <div class="prompt" id="prompt">あいさつ を する</div>
+    <div class="guide" id="guide" aria-live="off"></div>
     <p class="note" id="recTarget" style="text-align:center">この言葉を読んでください</p>
     <div class="notice" id="micNotice" hidden></div>
     <canvas class="wave" id="recWave" aria-label="録音の波形"></canvas>
@@ -181,6 +202,7 @@ details summary{padding-block:4px}
       <button class="btn" id="delClipBtn" disabled>録り直す</button>
     </div>
     <div class="status" id="recStatus"></div>
+    <div class="check" id="checkBox" hidden><div id="checkBody"></div><div class="row"><button class="btn small" id="keepBtn" hidden>このまま使う</button></div></div>
     <div id="segBox" class="panel" style="background:var(--bg)" hidden>
       <h2>区切りの確認 <small id="segInfo"></small></h2>
       <div class="segs" id="segs"></div>
@@ -303,7 +325,7 @@ function dbAll(){ return new Promise(res=>{ if(!idb) return res([]); try{ const 
 function dbPut(k,v){ try{ if(idb) idb.transaction("clips","readwrite").objectStore("clips").put(v,k); }catch(e){} }
 function dbDel(k){ try{ if(idb) idb.transaction("clips","readwrite").objectStore("clips").delete(k); }catch(e){} }
 function dbClear(){ try{ if(idb) idb.transaction("clips","readwrite").objectStore("clips").clear(); }catch(e){} }
-function setClip(k,pcm,kind,src){ const v={pcm,kind:kind||(ALL_KEYS.includes(k)?"kana":"phrase"),src:src||"single",t:Date.now()}; clips.set(k,v); dbPut(k,v); clipRev++; }
+function setClip(k,pcm,kind,src,extra){ const v=Object.assign({pcm,kind:kind||(ALL_KEYS.includes(k)?"kana":"phrase"),src:src||"single",t:Date.now()},extra||{}); clips.set(k,v); dbPut(k,v); clipRev++; }
 function delClip(k){ clips.delete(k); dbDel(k); clipRev++; }
 
 /* ---------- DSP helpers ---------- */
@@ -437,7 +459,7 @@ function localPlan(text){
 function joinPlain(bs){ const n=bs.reduce((a,b)=>a+b.length,0), o=new Float32Array(n); let p=0; for(const b of bs){ o.set(b,p); p+=b.length; } return o; }
 function build(plan,opt){
   const smooth=!opt||opt.smooth!==false; const target=smooth?voiceF0():0; const baseMora=0.13; const rate=clamp((opt&&opt.rate)||1,0.5,3);
-  const units=[]; const missing=[]; rebuildUnits();
+  const units=[]; const missing=[]; rebuildUnits(); const use={chunk:0,single:0,miss:0};
   const sounding=t=>t.kind==="kana"||t.kind==="chunk"||t.kind==="phrase"||t.kind==="long";
   const firstMora=t=>t.kind==="long"?null:moraList(t.t)[0];
   const lastMora=t=>{ const m=moraList(t.t); return m[m.length-1]; };
@@ -452,13 +474,14 @@ function build(plan,opt){
       let pcm=null;
       const pt=i>0&&sounding(toks[i-1])&&toks[i-1].kind!=="long"?lastMora(toks[i-1]):(i>0&&toks[i-1].t==="っ"?"っ":null);
       const nt=i+1<toks.length&&sounding(toks[i+1])?firstMora(toks[i+1]):null;
-      if(tk.kind==="phrase"){ pcm=getPcm(tk.t); lastKana=tk.t; }
-      else if(tk.kind==="chunk"){ pcm=unitPcm(pickUnit(unitIdx.get(tk.t),pt,nt)); lastKana=tk.t; }
-      else if(tk.kind==="kana"){
+      const nm=tk.kind==="long"?1:moraCount(tk.t);
+      if(tk.kind==="phrase"){ pcm=getPcm(tk.t); lastKana=tk.t; use.chunk+=nm; }
+      else if(tk.kind==="chunk"){ use.chunk+=nm; pcm=unitPcm(pickUnit(unitIdx.get(tk.t),pt,nt)); lastKana=tk.t; }
+      else if(tk.kind==="kana"){ use.single+=1;
         const own=clips.get(tk.t);
         if(own&&own.src==="single"){ pcm=own.pcm; lastKana=tk.t; }
         else if(unitIdx.has(tk.t)){ pcm=unitPcm(pickUnit(unitIdx.get(tk.t),pt,nt)); lastKana=tk.t; }
-        else { const b=resolveKana(tk.t); if(b){ pcm=b.length===1?b[0]:joinPlain(b); lastKana=tk.t; } else missing.push(tk.t); } }
+        else { const b=resolveKana(tk.t); if(b){ pcm=b.length===1?b[0]:joinPlain(b); lastKana=tk.t; } else { missing.push(tk.t); use.single-=1; use.miss+=1; } } }
       else if(tk.kind==="long"){ const v=lastKana&&vowelOf(lastKana); const b=v&&getPcm(v); if(b) pcm=b.slice(Math.floor(b.length*0.25)); }
       else if(tk.kind==="gap"){ units.push({sil:Math.round(SR*(tk.t==="っ"||tk.t==="ッ"?0.06:tk.dur*0.8)/rate),label:tk.t}); return; }
       else missing.push(tk.t);
@@ -489,7 +512,7 @@ function build(plan,opt){
     for(let i=0;i<b.length;i++){ const k=st+i; if(i<ov){ const t=i/ov; if(k<prevEnd) out[k]*=Math.cos(t*Math.PI/2); out[k]+=b[i]*Math.sin(t*Math.PI/2); } else out[k]+=b[i]; }
     pos=st+b.length; prevSound=true; marks.push({t:u.label,start:st/SR,end:pos/SR});
   }
-  return {pcm:out.subarray(0,Math.max(pos,1)),marks,missing:[...new Set(missing)]};
+  return {pcm:out.subarray(0,Math.max(pos,1)),marks,missing:[...new Set(missing)],use};
 }
 
 /* ---------- AI agent: reading, phrasing, intonation, pace ---------- */
@@ -655,7 +678,7 @@ function renderScreen(marks){
 }
 let lastRender=null;
 async function synth(text){
-  const key=text+"|"+JSON.stringify(fx)+"|"+clipRev+"|"+$("aiOn").checked+$("smoothOn").checked+"|"+talkRate;
+  const key=text+"|"+JSON.stringify(fx)+"|"+clipRev+"|"+$("aiOn").checked+$("smoothOn").checked+"|"+talkRate+"|"+speakTone;
   if(lastRender&&lastRender.key===key) return lastRender;
   const plan=await getPlan(text);
   const b=build(plan,{smooth:$("smoothOn").checked,rate:talkRate});
@@ -672,6 +695,7 @@ async function speak(text){
   const {b,buf,timeScale}=r;
   renderScreen(b.marks);
   $("speakStatus").textContent=b.missing.length?"まだ録っていない文字は飛ばしました:"+b.missing.join(" "):"";
+  if(b.use){ const t=b.use.chunk+b.use.single+b.use.miss; if(t){ const pc=v=>Math.round(v/t*100)+"%"; $("useInfo").textContent="あなたの録音の使い方:かたまりのまま "+pc(b.use.chunk)+" ・ 1音ずつ "+pc(b.use.single)+(b.use.miss?" ・ 足りない音 "+pc(b.use.miss):""); } }
   const cv=$("view-fx").hidden?$("wave"):$("fxWave"); cv.hidden=false; waveImage(cv,buf.getChannelData(0),b.marks,timeScale);
   $("stopBtn").disabled=false;
   playBuffer(buf,t=>{ wavePlayhead(cv,t); const tt=t/timeScale; b.marks.forEach(m=>{ if(m.miss||!m.el) return; m.el.className=tt>=m.end?"done":(tt>=m.start?"on":""); }); },()=>{ b.marks.forEach(m=>{ if(m.el&&!m.miss) m.el.className="done"; }); waveImage(cv,buf.getChannelData(0),b.marks,timeScale); $("stopBtn").disabled=true; });
@@ -728,6 +752,10 @@ const SCRIPT={
 const SETS={L:SCRIPT.L.map(x=>x.kana),S:SCRIPT.A.concat(SCRIPT.B,SCRIPT.C)};
 const SHOW=Object.fromEntries(SCRIPT.L.map(x=>[x.kana,x.show]));
 const isLong=k=>!!SHOW[k];
+const PACE={slow:{mps:5,name:"ゆっくり"},normal:{mps:6.5,name:"ふつう"},fast:{mps:8,name:"はやめ"}};
+const TONES={normal:"ふつう",bright:"明るく",calm:"落ち着いて"};
+let recPace=LS.get("recPace","normal"), recTone=LS.get("recTone","normal"), speakTone=LS.get("speakTone","normal");
+const doneKey=k=>k+(recTone==="normal"?"":"@"+recTone);
 let scriptSet="L"; let scriptDone=new Set(LS.get("scriptDone",[])); let mode="script"; let lastTake=null;
 function moraList(s){ const out=[]; s=s.replace(/[^ぁ-ゖー]/g,""); for(let i=0;i<s.length;){ if(SMALLY[s[i+1]]){ out.push(s[i]+s[i+1]); i+=2; } else { out.push(s[i]); i++; } } return out; }
 function normalizeOnly(y){ let ss=0,pk=0; for(const v of y){ ss+=v*v; pk=Math.max(pk,Math.abs(v)); } const rms=Math.sqrt(ss/y.length)||1e-6; const g=Math.min(0.12/rms,0.95/(pk||1)); for(let i=0;i<y.length;i++) y[i]*=g; fade(y,Math.round(SR*0.006)); return y; }
@@ -767,27 +795,39 @@ function segmentMoras(x,text){
   const voiced=merged.filter(g=>g[1]-g[0]>=10); if(!voiced.length) return [];
   while(voiced.length>words.length&&words.length>1){ let gi=1,gv=Infinity; for(let i=1;i<voiced.length;i++){ const g=voiced[i][0]-voiced[i-1][1]; if(g<gv){gv=g;gi=i;} } voiced[gi-1][1]=voiced[gi][1]; voiced.splice(gi,1); }
   const chunks=voiced.length===words.length?voiced.map((g,i)=>({a:g[0],b:g[1],ms:words[i],w:i})):[{a:voiced[0][0],b:voiced[voiced.length-1][1],ms:words.flat(),w:0}];
-  const out=[]; const pad=Math.round(SR*0.012);
+  const out=[]; const pad=Math.round(SR*0.012); let dipSum=0,dipN=0,voicedFr=0;
   for(const c of chunks){
-    const bounds=alignBounds(r,c.a,c.b,c.ms);
+    const bounds=alignBounds(r,c.a,c.b,c.ms); voicedFr+=c.b-c.a;
+    for(let i=1;i<bounds.length-1;i++){ const j=bounds[i]; let mx=1e-9; for(let q=Math.max(c.a,j-12);q<Math.min(c.b,j+12);q++) mx=Math.max(mx,r[q]); dipSum+=r[j]/mx; dipN++; }
     c.ms.forEach((m,i)=>{ const s=Math.max(0,bounds[i]*fr-pad), e=Math.min(x.length,bounds[i+1]*fr+pad); if(e-s>SR*0.03) out.push({m,pcm:normalizeOnly(x.slice(s,e)),s,e,w:c.w}); });
   }
+  out.matched=voiced.length===words.length; out.dip=dipN?dipSum/dipN:0.3; out.mps=words.flat().length/Math.max(0.2,voicedFr*fr/SR); out.expected=words.flat().length;
   return out;
 }
-function learnFrom(pcm,text){
+function takeQuality(segs){
+  const n=segs.expected||segs.length, got=segs.length;
+  let q=(got===n?0.4:0)+(segs.matched?0.3:0.1)+0.3*(1-clamp(segs.dip,0,1));
+  if(got<n*0.9) q=Math.min(q,0.3);
+  if(segs.mps>16||segs.mps<2.5) q=Math.min(q,0.35);
+  return {q,got,n,mps:segs.mps};
+}
+function unitCount(text){ let c=0; for(const w of (/[、。？！?!,]/.test(text)?text.split(/[、。？！?!,]+/):text.split(/\s+/))){ const k=moraCount(w); for(let L=1;L<=6;L++) c+=Math.max(0,k-L+1); } return c; }
+function learnFrom(pcm,text,useIt){
   const segs=segmentMoras(pcm,text); waveImage($("recWave"),pcm,segs.map(g=>({t:g.m,start:g.s/SR,end:g.e/SR})));
-  let n=0; for(const {m,pcm:p} of segs){ if(m==="っ"||m==="ー"||!ALL_KEYS.includes(m)) continue; const cur=clips.get(m); if(cur&&cur.src==="single") continue; setClip(m,p,"kana","script"); n++; }
-  return n;
+  const info=takeQuality(segs); info.learned=0;
+  if(useIt!==false&&info.q>=0.45) for(const {m,pcm:p} of segs){ if(m==="っ"||m==="ー"||!ALL_KEYS.includes(m)) continue; const cur=clips.get(m); if(cur&&cur.src==="single") continue; setClip(m,p,"kana","script"); info.learned++; }
+  return info;
 }
 
 /* ---------- unit inventory: every mora and 2-6 mora run cut from natural recordings, with its context ---------- */
 const unitIdx=new Map(); let unitRev=-1;
-function scriptSpaced(key){ for(const p of SETS.L.concat(SETS.S)) if(p.replace(/\s/g,"")===key) return p; return key; }
+function scriptSpaced(key){ key=key.split("@")[0]; for(const p of SETS.L.concat(SETS.S)) if(p.replace(/\s/g,"")===key) return p; return key; }
 function rebuildUnits(){
   if(unitRev===clipRev) return; unitRev=clipRev; unitIdx.clear();
   const add=(k,inst)=>{ let a=unitIdx.get(k); if(!a) unitIdx.set(k,a=[]); a.push(inst); };
   for(const [k,c] of clips){
-    if(c.kind!=="phrase") continue;
+    if(c.kind!=="phrase"||(c.q!=null&&c.q<0.45)) continue;
+    const tone=c.tone||"normal";
     const text=scriptSpaced(k); const segs=segmentMoras(c.pcm,text);
     if(segs.length!==moraCount(text)) continue;
     for(let i=0;i<segs.length;i++){
@@ -796,7 +836,7 @@ function rebuildUnits(){
         const key=run.map(g=>g.m).join(""); if(key==="っ") continue;
         const prev=i>0&&segs[i-1].w===segs[i].w?segs[i-1].m:null;
         const nx=i+L<segs.length&&segs[i+L].w===segs[i].w?segs[i+L].m:null;
-        add(key,L===1?{pcm:run[0].pcm,prev,next:nx,L}:{src:c.pcm,s:run[0].s,e:run[L-1].e,prev,next:nx,L});
+        add(key,L===1?{pcm:run[0].pcm,prev,next:nx,L,tone}:{src:c.pcm,s:run[0].s,e:run[L-1].e,prev,next:nx,L,tone});
       }
     }
   }
@@ -808,12 +848,38 @@ function pickUnit(list,prev,next){
     if(prev){ if(u.prev){ if(vowelOf(u.prev)===vowelOf(prev)) sc+=2; if(u.prev===prev) sc+=1; } }
     else if(!u.prev) sc+=1.5;
     if(next){ if(u.next===next) sc+=1; else if(u.next&&u.next[0]===next[0]) sc+=0.5; } else if(!u.next) sc+=0.8;
+    if(u.tone===speakTone) sc+=3;
     if(sc>bs){ bs=sc; best=u; } }
   return best;
 }
 
 /* ---------- recording ---------- */
 let rec=null; let target=null; // target: {type:'script'|'phrase'|'kana'|'row', key, keys}
+/* ---------- pace guide: highlights each sound at the chosen speed while recording ---------- */
+const guide={timer:0,end:0,active:false};
+function guideText(){ if(!target) return ""; if(target.type==="script"||target.type==="phrase") return target.key; return ""; }
+function renderGuide(){
+  const g=$("guide"); g.textContent=""; const t=guideText(); if(!t) return [];
+  const spans=[]; const str=t.replace(/\s+/g," ");
+  for(let i=0;i<str.length;){ let u=str[i]; if(SMALLY[str[i+1]]) u=str.slice(i,i+2); i+=u.length; const sp=document.createElement("span"); sp.textContent=u; g.appendChild(sp); if(u!==" ") spans.push(sp); }
+  return spans;
+}
+function runGuide(){
+  stopGuide(); const spans=renderGuide(); if(!spans.length) return; const g=$("guide");
+  const per=1/PACE[recPace].mps; const steps=spans.map(sp=>{ const u=sp.textContent; return /[、,]/.test(u)?0.35:/[。？！?!]/.test(u)?0.6:u==="っ"?per*0.7:per; });
+  const cd=document.createElement("span"); cd.className="count"; g.prepend(cd);
+  let k=-3; guide.active=true; guide.end=0;
+  const tick=()=>{
+    if(!guide.active) return;
+    if(k<0){ cd.textContent=String(-k)+" "; k++; guide.timer=setTimeout(tick,450); return; }
+    if(k===0) cd.remove();
+    if(k>0) spans[k-1].className="done";
+    if(k<spans.length){ spans[k].className="on"; guide.timer=setTimeout(tick,steps[k]*1000); k++; }
+    else { guide.end=performance.now(); }
+  };
+  tick();
+}
+function stopGuide(){ guide.active=false; clearTimeout(guide.timer); }
 async function startRec(){
   if(!target){ toast("先に録るものを選んでください"); return; }
   const c=ctx();
@@ -827,15 +893,18 @@ async function startRec(){
     if(vad.noise.length<3){ vad.noise.push(rms); return; }
     const th=Math.max(0.012,Math.min(...vad.noise)*3.5);
     if(rms>th){ vad.speech=true; vad.silent=0; } else if(vad.speech) vad.silent+=blockSec;
-    if(($("autoStop").checked&&vad.speech&&vad.silent>=(target&&isLong(target.key)?1.6:1.0))||vad.total>40) setTimeout(()=>rec&&rec.proc===proc&&stopRec(),0);
+    const guided=guide.active||guide.end>0, afterGuide=guide.end>0?(performance.now()-guide.end)/1000:-1;
+    const stopNow=$("autoStop").checked&&vad.speech&&(guided?(afterGuide>=0&&(vad.silent>=0.6||afterGuide>2.5)):vad.silent>=(target&&isLong(target.key)?1.6:1.0));
+    if(stopNow||vad.total>40) setTimeout(()=>rec&&rec.proc===proc&&stopRec(),0);
   };
   const mute=c.createGain(); mute.gain.value=0; srcN.connect(proc); proc.connect(mute); mute.connect(c.destination);
   live.peaks=[]; rec={stream,srcN,proc,chunks,rate:c.sampleRate};
-  $("recBtn").textContent="■ 止める"; $("prompt").classList.add("rec"); $("recStatus").textContent="録音中… 読み終わると自動で止まります";
+  $("recBtn").textContent="■ 止める"; $("prompt").classList.add("rec"); $("checkBox").hidden=true;
+  guide.end=0; if(guideText()){ runGuide(); $("recStatus").textContent="下の文字が光る速さに合わせて読んでください。読み終わると自動で止まります"; } else $("recStatus").textContent="録音中… 読み終わると自動で止まります";
 }
 async function stopRec(){
   const r=rec; rec=null; r.proc.disconnect(); r.srcN.disconnect(); r.stream.getTracks().forEach(t=>t.stop());
-  $("recBtn").textContent="● 録音"; $("prompt").classList.remove("rec");
+  $("recBtn").textContent="● 録音"; $("prompt").classList.remove("rec"); stopGuide(); guide.end=0;
   const total=r.chunks.reduce((a,b)=>a+b.length,0); const all=new Float32Array(total); let o=0; for(const ch of r.chunks){all.set(ch,o);o+=ch.length;}
   handleAudio(resample(all,r.rate/SR));
 }
@@ -855,13 +924,32 @@ function handleAudio(pcm){
     setClip(target.key,y,"kana","single"); lastTake={pcm:y,target}; waveImage($("recWave"),y,[{t:target.key,start:0,end:y.length/SR}]); $("recStatus").textContent="「"+target.key+"」を登録しました。";
     refreshAll(); const i=ALL_KEYS.indexOf(target.key); const nx=ALL_KEYS.slice(i+1).find(k=>!clips.has(k)); if(nx) selectKana(nx); else updateTargetUI(); return;
   }
-  const key=target.key.replace(/\s/g,"");
-  setClip(key,y,"phrase",target.type==="script"?"script":"user");
-  const n=learnFrom(y,target.key);
-  lastTake={pcm:y,target};
-  $("recStatus").textContent="「"+target.key+"」を登録しました("+n+"文字ぶん)。";
-  if(target.type==="script"){ scriptDone.add(target.key); LS.set("scriptDone",[...scriptDone]); nextPrompt(); }
-  else { $("phraseIn").value=""; target=null; }
+  const base=target.key.replace(/\s/g,""), key=base+(recTone==="normal"?"":"@"+recTone);
+  const info=learnFrom(y,target.key,recTone==="normal");
+  setClip(key,y,"phrase",target.type==="script"?"script":"user",{tone:recTone,pace:recPace,q:info.q});
+  lastTake={pcm:y,target,key};
+  showCheck(info,target.key);
+  if(info.q>=0.45) acceptTake();
+  refreshAll();
+}
+function showCheck(info,text){
+  const box=$("checkBox"), body=$("checkBody"); box.hidden=false; body.textContent="";
+  const line=(cls,t)=>{ const d=document.createElement("div"); if(cls) d.className=cls; d.textContent=t; body.appendChild(d); };
+  const pct=Math.round(info.q*100);
+  if(info.q>=0.7) line("ok","◎ よく使えます(区切りの確かさ "+pct+"%)");
+  else if(info.q>=0.45) line("ok","○ 使えます(区切りの確かさ "+pct+"%)");
+  else line("warn","△ 区切りがあいまいです(区切りの確かさ "+pct+"%)。録り直しをおすすめします");
+  line("",info.q>=0.45?(info.got+" / "+info.n+" 音を切り分け、"+unitCount(text)+" 個の音のかたまりとして使えます。"):(info.got+" / "+info.n+" 音しか切り分けられませんでした。このままではしゃべるときに使いません。"));
+  const ratio=info.mps/PACE[recPace].mps;
+  line(ratio>1.3||ratio<0.72?"warn":"","読んだ速さ:1秒に約"+info.mps.toFixed(1)+"音("+(ratio>1.3?"ガイドより速め":ratio<0.72?"ガイドよりゆっくり":"ガイドどおり")+")・話し方:"+TONES[recTone]);
+  $("keepBtn").hidden=info.q>=0.45;
+}
+function acceptTake(){
+  const t=lastTake&&lastTake.target; if(!t) return;
+  const c=clips.get(lastTake.key); if(c&&c.q<0.45){ c.q=0.45; dbPut(lastTake.key,c); clipRev++; }
+  $("keepBtn").hidden=true;
+  if(t.type==="script"){ scriptDone.add(doneKey(t.key)); LS.set("scriptDone",[...scriptDone]); if(target===t) nextPrompt(); }
+  else { $("phraseIn").value=""; if(target===t) target=null; }
   refreshAll();
 }
 function showSegs(){
@@ -873,7 +961,7 @@ function showSegs(){
 }
 function nextPrompt(from){
   const list=SETS[scriptSet]; let i=from??(target&&target.type==="script"?list.indexOf(target.key)+1:0);
-  let k=list.slice(i).find(p=>!scriptDone.has(p))||list.find(p=>!scriptDone.has(p));
+  let k=list.slice(i).find(p=>!scriptDone.has(doneKey(p)))||list.find(p=>!scriptDone.has(doneKey(p)));
 
   if(!k){ target=null; updateTargetUI(); $("prompt").textContent="ぜんぶ録り終わりました"; $("recTarget").textContent="「しゃべる」で試してみてください。録り直したい言葉はセットを選び直すと出てきます。"; return; }
   target={type:"script",key:k}; updateTargetUI();
@@ -882,7 +970,7 @@ function setScriptSet(s){ scriptSet=s; ["L","S"].forEach(x=>$("set"+x).setAttrib
 function setMode(m){
   mode=m; document.querySelectorAll(".mode").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===m)));
   $("scriptHead").hidden=m!=="script"; $("phraseHead").hidden=m!=="phrase"; $("segBox").hidden=true; $("recStatus").textContent="";
-  $("recHelp").textContent={script:"表示された文を、ふだん話す感じで読んでください。「、」や「。」で軽く息つぎすると、うまく切り分けられます。長文17本でひらがな・にごる音・小さい「ゃゅょ」・「っ」「ー」がひととおりそろい、文の中の音のつながりや抑揚もそのまま覚えます。話し終わって少し黙ると自動で止まります。",
+  $("recHelp").textContent={script:"「読む速さ」と「話し方」を選んで「録音」を押すと、3・2・1のあとに下の文字が順に光ります。その速さに合わせて読んでください。「、」や「。」で軽く息つぎすると、うまく切り分けられます。録った直後に、何音を切り分けて使えるかを表示します。話し方を変えて同じ文を録ると、しゃべるときに話し方を選べます。長文17本でひらがな・にごる音・小さい「ゃゅょ」・「っ」「ー」がひととおりそろい、文の中の音のつながりや抑揚もそのまま覚えます。話し終わって少し黙ると自動で止まります。",
     phrase:"よく使う言葉や短い文をひらがなで入れて「決定」、それから録音します。その言葉をしゃべるときは丸ごと使い、含まれている文字も覚えます。",
     kana:"下の「文字ごとに確認する」を開いて、気になる文字をタップして録り直せます。行の見出しの「行ごと録音」で「か、き、く、け、こ」と区切って一気に録ることもできます。"}[m];
   if(m==="script") nextPrompt(0);
@@ -910,11 +998,13 @@ function updateTargetUI(){
   document.querySelectorAll(".k.sel").forEach(e=>e.classList.remove("sel"));
   $("playClipBtn").disabled=!lastTake; $("delClipBtn").disabled=!lastTake;
   $("recBtn").disabled=!target;
-  ["L","S"].forEach(x=>$("cnt"+x).textContent=SETS[x].filter(p=>scriptDone.has(p)).length+"/"+SETS[x].length);
-  if(!target){ if(mode==="phrase"){ $("prompt").textContent="……"; $("recTarget").textContent="上に言葉を入れて「決定」を押してください"; } return; }
+  ["L","S"].forEach(x=>$("cnt"+x).textContent=SETS[x].filter(p=>scriptDone.has(doneKey(p))).length+"/"+SETS[x].length);
+  $("pickers").hidden=!(target?(target.type==="script"||target.type==="phrase"):(mode!=="kana"));
+  if(!target){ $("guide").textContent=""; if(mode==="phrase"){ $("prompt").textContent="……"; $("recTarget").textContent="上に言葉を入れて「決定」を押してください"; } return; }
   $("prompt").classList.toggle("long",target.type==="script"&&isLong(target.key));
+  if(!rec) renderGuide();
   if(target.type==="script"){ const list=SETS[scriptSet]; const pos=(list.indexOf(target.key)+1)+" / "+list.length;
-    if(isLong(target.key)){ $("prompt").textContent=SHOW[target.key]; $("recTarget").textContent=pos+"  よみ:"+target.key; }
+    if(isLong(target.key)){ $("prompt").textContent=SHOW[target.key]; $("recTarget").textContent=pos+"  下の光る文字に合わせて読んでください"; }
     else { $("prompt").textContent=target.key; $("recTarget").textContent=pos+"  この言葉を読んでください"; } }
   else if(target.type==="kana"){ const el=document.querySelector('.k[data-k="'+target.key+'"]'); el&&el.classList.add("sel"); $("prompt").textContent=target.key; $("recTarget").textContent="この1文字だけを言ってください"; }
   else if(target.type==="row"){ $("prompt").textContent=target.keys.join("、"); $("recTarget").textContent="一音ずつ間をあけて読んでください"; }
@@ -1005,6 +1095,12 @@ $("clearBtn").onclick=()=>{ $("text").value=""; LS.set("text",""); $("text").foc
 $("text").addEventListener("input",()=>LS.set("text",$("text").value));
 $("text").addEventListener("keydown",e=>{ if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){ e.preventDefault(); speak(); } });
 $("kanjiBtn").onclick=kanjiToKana;
+function syncSeg(id,attr,val){ document.querySelectorAll("#"+id+" button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset[attr]===val))); }
+document.querySelectorAll("#paceSeg button").forEach(b=>b.onclick=()=>{ recPace=b.dataset.pace; LS.set("recPace",recPace); syncSeg("paceSeg","pace",recPace); });
+document.querySelectorAll("#toneSeg button").forEach(b=>b.onclick=()=>{ recTone=b.dataset.tone; LS.set("recTone",recTone); syncSeg("toneSeg","tone",recTone); if(mode==="script") nextPrompt(0); else updateTargetUI(); });
+document.querySelectorAll("#speakToneSeg button").forEach(b=>b.onclick=()=>{ speakTone=b.dataset.tone; LS.set("speakTone",speakTone); syncSeg("speakToneSeg","tone",speakTone); lastRender=null; speak(); });
+syncSeg("paceSeg","pace",recPace); syncSeg("toneSeg","tone",recTone); syncSeg("speakToneSeg","tone",speakTone);
+$("keepBtn").onclick=acceptTake;
 function setRate(v){ talkRate=clamp(+v,0.6,3); LS.set("rate",talkRate); $("rate").value=talkRate; $("rateOut").textContent=talkRate.toFixed(2)+"×"; document.querySelectorAll("[data-rate]").forEach(b=>b.setAttribute("aria-pressed",String(Math.abs(+b.dataset.rate-talkRate)<0.01))); }
 $("rate").oninput=e=>setRate(e.target.value); $("rate").onchange=()=>{ if(!playing) speak(); };
 document.querySelectorAll("[data-rate]").forEach(b=>b.onclick=()=>{ setRate(b.dataset.rate); speak(); });
@@ -1019,7 +1115,7 @@ $("saveWavBtn").onclick=async()=>{
 $("addChip").onclick=()=>{ const t=$("text").value.trim(); if(!t) return; if(!chips.includes(t)){ chips.push(t); LS.set("chips",chips); renderChips(); toast("登録しました"); } };
 $("recBtn").onclick=()=>rec?stopRec():startRec();
 $("playClipBtn").onclick=()=>{ if(lastTake) playPcm(lastTake.pcm); };
-$("delClipBtn").onclick=()=>{ if(!lastTake) return; const t=lastTake.target; if(t.type==="script"){ scriptDone.delete(t.key); LS.set("scriptDone",[...scriptDone]); if(mode!=="script") setMode("script"); } else if(t.type==="phrase"){ if(mode!=="phrase") setMode("phrase"); $("phraseIn").value=t.key; } target=t; lastTake=null; $("recStatus").textContent="もう一度どうぞ。"; updateTargetUI(); };
+$("delClipBtn").onclick=()=>{ if(!lastTake) return; const t=lastTake.target; if(t.type==="script"){ scriptDone.delete(doneKey(t.key)); LS.set("scriptDone",[...scriptDone]); if(mode!=="script") setMode("script"); } else if(t.type==="phrase"){ if(mode!=="phrase") setMode("phrase"); $("phraseIn").value=t.key; } target=t; lastTake=null; $("recStatus").textContent="もう一度どうぞ。"; updateTargetUI(); };
 document.querySelectorAll(".mode").forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
 $("setL").onclick=()=>setScriptSet("L"); $("setS").onclick=()=>setScriptSet("S");
 $("skipBtn").onclick=()=>{ if(target&&target.type==="script"){ const l=SETS[scriptSet]; const i=l.indexOf(target.key); target={type:"script",key:l[(i+1)%l.length]}; updateTargetUI(); } };
