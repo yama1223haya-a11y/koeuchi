@@ -166,7 +166,7 @@ details summary{padding-block:4px}
       <button class="mode" data-mode="kana" aria-pressed="false">1文字ずつ</button>
     </div>
     <div id="scriptHead" class="row" style="justify-content:space-between">
-      <div class="row"><button class="chip" id="setA" aria-pressed="true">基本 <span id="cntA"></span></button><button class="chip" id="setB" aria-pressed="false">にごる音・ゃゅょ <span id="cntB"></span></button></div>
+      <div class="row"><button class="chip" id="setA" aria-pressed="true">基本 <span id="cntA"></span></button><button class="chip" id="setB" aria-pressed="false">にごる音・ゃゅょ <span id="cntB"></span></button><button class="chip" id="setC" aria-pressed="false">よく使う言葉 <span id="cntC"></span></button></div>
       <button class="btn small" id="skipBtn">とばす</button>
     </div>
     <div id="phraseHead" class="row" hidden><input type="text" id="phraseIn" placeholder="例:おはよう、ありがとう" aria-label="登録する言葉(ひらがな)" style="flex:1;min-width:0"><button class="btn" id="phraseSel">決定</button></div>
@@ -370,6 +370,11 @@ function tokenize(raw){
   for(let i=0;i<s.length;){
     const ch=s[i];
     const ph=pk.find(p=>s.startsWith(p,i)); if(ph){ toks.push({t:ph,kind:"phrase"}); i+=ph.length; continue; }
+    if(/[ぁ-ゖ]/.test(ch)&&ch!=="っ"&&unitIdx.size){
+      const ms=[]; let j=i; while(ms.length<6&&j<s.length&&/[ぁ-ゖー]/.test(s[j])){ const u=SMALLY[s[j+1]]?s.slice(j,j+2):s[j]; ms.push(u); j+=u.length; }
+      let hit=null; for(let L=ms.length;L>=2;L--){ const key=ms.slice(0,L).join(""); if(unitIdx.has(key)){ hit=key; break; } }
+      if(hit){ toks.push({t:hit,kind:"chunk"}); i+=hit.length; continue; }
+    }
     if(SMALLY[s[i+1]] && /[ぁ-ゖ]/.test(ch)){ toks.push({t:ch+s[i+1],kind:"kana"}); i+=2; continue; }
     if(ch==="っ"||ch==="ッ"){ toks.push({t:ch,kind:"gap",dur:0.09}); i++; continue; }
     if(ch==="ー"||ch==="〜"||ch==="~"){ toks.push({t:ch,kind:"long"}); i++; continue; }
@@ -420,8 +425,9 @@ let voiceF0Memo={rev:-1,v:0};
 function voiceF0(){ if(voiceF0Memo.rev===clipRev) return voiceF0Memo.v; const fs=[]; for(const [k,c] of clips){ if(c.kind==="kana"){ const f=f0Of(c.pcm); if(f) fs.push(f); } } voiceF0Memo={rev:clipRev,v:median(fs)}; return voiceF0Memo.v; }
 function moraCount(k){ return moraList(k).length; }
 function ruleContour(n,q){ const out=[]; for(let j=0;j<n;j++) out.push(j===0&&n>1?-0.8:1.2-2.6*(j/Math.max(1,n-1))); if(q&&n){ out[n-1]+=4; if(n>1) out[n-2]+=1; } return out; }
+function particleFix(s){ return s.replace(/([ぁ-ゖー])は(?=[\s　、。,，．.！!？?]|$)/g,"$1わ").replace(/([ぁ-ゖー])へ(?=[\s　、。,，．.！!？?]|$)/g,"$1え").replace(/[ 　]+/g,""); }
 function localPlan(text){
-  const s=normalizeText(text); const segs=[]; let cur="";
+  const s=particleFix(normalizeText(text)); const segs=[]; let cur="";
   const push=(ch)=>{ const q=/[？?]/.test(ch); const pause=/[、,，]/.test(ch)?0.22:0.42; if(cur.trim()) segs.push({kana:cur,pitch:null,rate:1,pause,q}); else if(segs.length){ const l=segs[segs.length-1]; l.pause=Math.max(l.pause,pause); l.q=l.q||q; } cur=""; };
   for(const ch of s){ if(/[、,，。．.！!？?\n]/.test(ch)) push(ch); else cur+=ch; }
   if(cur.trim()) segs.push({kana:cur,pitch:null,rate:1,pause:0.3,q:false});
@@ -430,18 +436,28 @@ function localPlan(text){
 function joinPlain(bs){ const n=bs.reduce((a,b)=>a+b.length,0), o=new Float32Array(n); let p=0; for(const b of bs){ o.set(b,p); p+=b.length; } return o; }
 function build(plan,opt){
   const smooth=!opt||opt.smooth!==false; const target=smooth?voiceF0():0; const baseMora=0.13; const rate=clamp((opt&&opt.rate)||1,0.5,3);
-  const units=[]; const missing=[];
+  const units=[]; const missing=[]; rebuildUnits();
+  const sounding=t=>t.kind==="kana"||t.kind==="chunk"||t.kind==="phrase"||t.kind==="long";
+  const firstMora=t=>t.kind==="long"?null:moraList(t.t)[0];
+  const lastMora=t=>{ const m=moraList(t.t); return m[m.length-1]; };
   for(const seg of plan.segments){
     const toks=tokenize(seg.kana);
-    let nM=0; const tm=toks.map(t=>{ const m=t.kind==="phrase"?moraCount(t.t):(t.kind==="kana"||t.kind==="long"||(t.kind==="gap"&&(t.t==="っ"||t.t==="ッ")))?1:0; const o={start:nM,n:m}; nM+=m; return o; });
+    let nM=0; const tm=toks.map(t=>{ const m=(t.kind==="phrase"||t.kind==="chunk")?moraCount(t.t):(t.kind==="kana"||t.kind==="long"||(t.kind==="gap"&&(t.t==="っ"||t.t==="ッ")))?1:0; const o={start:nM,n:m}; nM+=m; return o; });
     const contour=(seg.pitch&&seg.pitch.length===nM)?seg.pitch:ruleContour(nM,seg.q);
     const strength=seg.pitch?1:0.8;
-    let lastIdx=-1; toks.forEach((t,i)=>{ if(t.kind==="kana"||t.kind==="phrase"||t.kind==="long") lastIdx=i; });
+    let lastIdx=-1; toks.forEach((t,i)=>{ if(sounding(t)) lastIdx=i; });
     let lastKana=null;
     toks.forEach((tk,i)=>{
       let pcm=null;
+      const pt=i>0&&sounding(toks[i-1])&&toks[i-1].kind!=="long"?lastMora(toks[i-1]):(i>0&&toks[i-1].t==="っ"?"っ":null);
+      const nt=i+1<toks.length&&sounding(toks[i+1])?firstMora(toks[i+1]):null;
       if(tk.kind==="phrase"){ pcm=getPcm(tk.t); lastKana=tk.t; }
-      else if(tk.kind==="kana"){ const b=resolveKana(tk.t); if(b){ pcm=b.length===1?b[0]:joinPlain(b); lastKana=tk.t; } else missing.push(tk.t); }
+      else if(tk.kind==="chunk"){ pcm=pickUnit(unitIdx.get(tk.t),pt,nt).pcm; lastKana=tk.t; }
+      else if(tk.kind==="kana"){
+        const own=clips.get(tk.t);
+        if(own&&own.src==="single"){ pcm=own.pcm; lastKana=tk.t; }
+        else if(unitIdx.has(tk.t)){ pcm=pickUnit(unitIdx.get(tk.t),pt,nt).pcm; lastKana=tk.t; }
+        else { const b=resolveKana(tk.t); if(b){ pcm=b.length===1?b[0]:joinPlain(b); lastKana=tk.t; } else missing.push(tk.t); } }
       else if(tk.kind==="long"){ const v=lastKana&&vowelOf(lastKana); const b=v&&getPcm(v); if(b) pcm=b.slice(Math.floor(b.length*0.25)); }
       else if(tk.kind==="gap"){ units.push({sil:Math.round(SR*(tk.t==="っ"||tk.t==="ッ"?0.06:tk.dur*0.8)/rate),label:tk.t}); return; }
       else missing.push(tk.t);
@@ -451,7 +467,7 @@ function build(plan,opt){
       if(smooth&&target){ const f=f0Of(pcm); if(f) semi+=12*Math.log2(target/f); }
       semi=Math.max(-8,Math.min(8,semi));
       let ratio=1/(seg.rate||1);
-      if(smooth&&tk.kind!=="phrase") ratio*=Math.pow(baseMora*(tk.kind==="long"?0.9:1)/(pcm.length/SR),0.65);
+      if(smooth&&tk.kind!=="phrase") ratio*=Math.pow(baseMora*(tk.kind==="long"?0.9:(tk.kind==="chunk"?m.n:1))/(pcm.length/SR),0.65);
       if(i===lastIdx) ratio*=1.15;
       if(!smooth&&!seg.pitch&&plan.source==="rule"){ semi=0; ratio=1; }
       ratio=Math.max(0.3,Math.min(2.2,ratio/rate));
@@ -686,7 +702,8 @@ async function saveFile(filename,bytes,type){
 /* ---------- reading script (covers every kana) ---------- */
 const SCRIPT={
  A:["あいさつ を する","けむり と くも","ねこ の しっぽ","ひなた ぼっこ","ふゆ の よる","へや を でる","ほしい もの","ぬれた せなか","そら に みえる","てがみ を よむ","わかめ の みそしる","まめ を にる","ちいさな えき","きんようび","はるの にわ","おにぎり と ろうそく"],
- B:["げんき な ぞう","ござる ぜんぶ","だいず と ぎんが","ぐらす に ぴざ","べんとう を ぼくが","ぱぴぷぺぽ","じてんしゃ と どうぶつ","ばなな と じゅく","じゃんけん ぎゅうにゅう","きゃべつ と しゃしん","ちゃわん の ちょこ","しゅくだい と きょう","きゅうり と ちゅうい","じょうず な ぎょうざ","びょういん と りょこう","ぎゃく の ひゃく","しょうゆ と りゅう"]
+ B:["げんき な ぞう","ござる ぜんぶ","だいず と ぎんが","ぐらす に ぴざ","べんとう を ぼくが","ぱぴぷぺぽ","じてんしゃ と どうぶつ","ばなな と じゅく","じゃんけん ぎゅうにゅう","きゃべつ と しゃしん","ちゃわん の ちょこ","しゅくだい と きょう","きゅうり と ちゅうい","じょうず な ぎょうざ","びょういん と りょこう","ぎゃく の ひゃく","しょうゆ と りゅう"],
+ C:["わたしです","ありがとうございます","すみません","ちょっとまって","そうですね","どうしたの","なにしてるの","いいよ","わかった","だいじょうぶ","ほんとうに","またね","おはよう","こんにちわ","たのしかったです","いきましょう","それもいいね","なんでもないよ"]
 };
 let scriptSet="A"; let scriptDone=new Set(LS.get("scriptDone",[])); let mode="script"; let lastTake=null;
 function moraList(s){ const out=[]; s=s.replace(/\s/g,""); for(let i=0;i<s.length;){ if(SMALLY[s[i+1]]){ out.push(s[i]+s[i+1]); i+=2; } else { out.push(s[i]); i++; } } return out; }
@@ -702,13 +719,13 @@ function segmentMoras(x,text){
   if(st>=0) regs.push([st,r.length]);
   const merged=[]; for(const g of regs){ if(merged.length&&g[0]-merged[merged.length-1][1]<30) merged[merged.length-1][1]=g[1]; else merged.push(g.slice()); }
   const voiced=merged.filter(g=>g[1]-g[0]>=10); if(!voiced.length) return [];
-  const chunks=voiced.length===words.length?voiced.map((g,i)=>({a:g[0],b:g[1],ms:words[i]})):[{a:voiced[0][0],b:voiced[voiced.length-1][1],ms:words.flat()}];
+  const chunks=voiced.length===words.length?voiced.map((g,i)=>({a:g[0],b:g[1],ms:words[i],w:i})):[{a:voiced[0][0],b:voiced[voiced.length-1][1],ms:words.flat(),w:0}];
   const out=[]; const pad=Math.round(SR*0.012);
   for(const c of chunks){
     const n=c.ms.length, L=c.b-c.a, bounds=[c.a];
     for(let i=1;i<n;i++){ const nom=c.a+L*i/n, w=L/n*0.35; let best=Math.round(nom), bv=Infinity; for(let j=Math.max(bounds[i-1]+3,Math.round(nom-w)); j<=Math.min(c.b-3,Math.round(nom+w)); j++){ if(r[j]<bv){bv=r[j];best=j;} } bounds.push(best); }
     bounds.push(c.b);
-    c.ms.forEach((m,i)=>{ const s=Math.max(0,bounds[i]*fr-pad), e=Math.min(x.length,bounds[i+1]*fr+pad); if(e-s>SR*0.03) out.push({m,pcm:normalizeOnly(x.slice(s,e)),s,e}); });
+    c.ms.forEach((m,i)=>{ const s=Math.max(0,bounds[i]*fr-pad), e=Math.min(x.length,bounds[i+1]*fr+pad); if(e-s>SR*0.03) out.push({m,pcm:normalizeOnly(x.slice(s,e)),s,e,w:c.w}); });
   }
   return out;
 }
@@ -716,6 +733,37 @@ function learnFrom(pcm,text){
   const segs=segmentMoras(pcm,text); waveImage($("recWave"),pcm,segs.map(g=>({t:g.m,start:g.s/SR,end:g.e/SR})));
   let n=0; for(const {m,pcm:p} of segs){ if(m==="っ"||m==="ー"||!ALL_KEYS.includes(m)) continue; const cur=clips.get(m); if(cur&&cur.src==="single") continue; setClip(m,p,"kana","script"); n++; }
   return n;
+}
+
+/* ---------- unit inventory: every mora and 2-6 mora run cut from natural recordings, with its context ---------- */
+const unitIdx=new Map(); let unitRev=-1;
+function scriptSpaced(key){ for(const p of SCRIPT.A.concat(SCRIPT.B,SCRIPT.C)) if(p.replace(/\s/g,"")===key) return p; return key; }
+function rebuildUnits(){
+  if(unitRev===clipRev) return; unitRev=clipRev; unitIdx.clear();
+  const add=(k,inst)=>{ let a=unitIdx.get(k); if(!a) unitIdx.set(k,a=[]); a.push(inst); };
+  for(const [k,c] of clips){
+    if(c.kind!=="phrase") continue;
+    const text=scriptSpaced(k); const segs=segmentMoras(c.pcm,text);
+    if(segs.length!==moraCount(text)) continue;
+    for(let i=0;i<segs.length;i++){
+      for(let L=1;L<=6&&i+L<=segs.length;L++){
+        const run=segs.slice(i,i+L); if(run.some(g=>g.w!==segs[i].w)) break;
+        const key=run.map(g=>g.m).join(""); if(key==="っ") continue;
+        const prev=i>0&&segs[i-1].w===segs[i].w?segs[i-1].m:null;
+        const nx=i+L<segs.length&&segs[i+L].w===segs[i].w?segs[i+L].m:null;
+        add(key,{pcm:L===1?run[0].pcm:normalizeOnly(c.pcm.slice(run[0].s,run[L-1].e)),prev,next:nx,L});
+      }
+    }
+  }
+}
+function pickUnit(list,prev,next){
+  let best=list[0],bs=-1;
+  for(const u of list){ let sc=0;
+    if(prev){ if(u.prev){ if(vowelOf(u.prev)===vowelOf(prev)) sc+=2; if(u.prev===prev) sc+=1; } }
+    else if(!u.prev) sc+=1.5;
+    if(next){ if(u.next===next) sc+=1; else if(u.next&&u.next[0]===next[0]) sc+=0.5; } else if(!u.next) sc+=0.8;
+    if(sc>bs){ bs=sc; best=u; } }
+  return best;
 }
 
 /* ---------- recording ---------- */
@@ -781,14 +829,15 @@ function nextPrompt(from){
   const list=SCRIPT[scriptSet]; let i=from??(target&&target.type==="script"?list.indexOf(target.key)+1:0);
   let k=list.slice(i).find(p=>!scriptDone.has(p))||list.find(p=>!scriptDone.has(p));
   if(!k&&scriptSet==="A"&&SCRIPT.B.some(p=>!scriptDone.has(p))){ setScriptSet("B"); toast("基本の台本が終わりました。続けて仕上げもどうぞ"); return; }
+  if(!k&&scriptSet==="B"&&SCRIPT.C.some(p=>!scriptDone.has(p))){ setScriptSet("C"); toast("続けて、よく使う言葉を録るともっと自然になります"); return; }
   if(!k){ target=null; updateTargetUI(); $("prompt").textContent="ぜんぶ録り終わりました"; $("recTarget").textContent="「しゃべる」で試してみてください。録り直したい言葉はセットを選び直すと出てきます。"; return; }
   target={type:"script",key:k}; updateTargetUI();
 }
-function setScriptSet(s){ scriptSet=s; $("setA").setAttribute("aria-pressed",String(s==="A")); $("setB").setAttribute("aria-pressed",String(s==="B")); target=null; nextPrompt(0); }
+function setScriptSet(s){ scriptSet=s; ["A","B","C"].forEach(x=>$("set"+x).setAttribute("aria-pressed",String(s===x))); target=null; nextPrompt(0); }
 function setMode(m){
   mode=m; document.querySelectorAll(".mode").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===m)));
   $("scriptHead").hidden=m!=="script"; $("phraseHead").hidden=m!=="phrase"; $("segBox").hidden=true; $("recStatus").textContent="";
-  $("recHelp").textContent={script:"表示された言葉を、ふだんの速さではっきり読んでください。言葉と言葉の間を少しあけると、1文字ずつにうまく切り分けられます。基本の16個を読むと、ひらがながひととおりそろいます。",
+  $("recHelp").textContent={script:"表示された言葉を、ふだんの速さではっきり読んでください。言葉と言葉の間を少しあけると、1文字ずつにうまく切り分けられます。基本の16個でひらがながそろいます。「よく使う言葉」まで録ると、録った言葉から2〜4音のかたまりを切り出して使うので、つなぎ目が減って自然になります。",
     phrase:"よく使う言葉や短い文をひらがなで入れて「決定」、それから録音します。その言葉をしゃべるときは丸ごと使い、含まれている文字も覚えます。",
     kana:"下の「文字ごとに確認する」を開いて、気になる文字をタップして録り直せます。行の見出しの「行ごと録音」で「か、き、く、け、こ」と区切って一気に録ることもできます。"}[m];
   if(m==="script") nextPrompt(0);
@@ -817,7 +866,7 @@ function updateTargetUI(){
   $("playClipBtn").disabled=!lastTake; $("delClipBtn").disabled=!lastTake;
   $("recBtn").disabled=!target;
   const cA=SCRIPT.A.filter(p=>scriptDone.has(p)).length, cB=SCRIPT.B.filter(p=>scriptDone.has(p)).length;
-  $("cntA").textContent=cA+"/"+SCRIPT.A.length; $("cntB").textContent=cB+"/"+SCRIPT.B.length;
+  $("cntA").textContent=cA+"/"+SCRIPT.A.length; $("cntB").textContent=cB+"/"+SCRIPT.B.length; $("cntC").textContent=SCRIPT.C.filter(p=>scriptDone.has(p)).length+"/"+SCRIPT.C.length;
   if(!target){ if(mode==="phrase"){ $("prompt").textContent="……"; $("recTarget").textContent="上に言葉を入れて「決定」を押してください"; } return; }
   if(target.type==="script"){ $("prompt").textContent=target.key; const list=SCRIPT[scriptSet]; $("recTarget").textContent=(list.indexOf(target.key)+1)+" / "+list.length+"  この言葉を読んでください"; }
   else if(target.type==="kana"){ const el=document.querySelector('.k[data-k="'+target.key+'"]'); el&&el.classList.add("sel"); $("prompt").textContent=target.key; $("recTarget").textContent="この1文字だけを言ってください"; }
@@ -925,7 +974,7 @@ $("recBtn").onclick=()=>rec?stopRec():startRec();
 $("playClipBtn").onclick=()=>{ if(lastTake) playPcm(lastTake.pcm); };
 $("delClipBtn").onclick=()=>{ if(!lastTake) return; const t=lastTake.target; if(t.type==="script"){ scriptDone.delete(t.key); LS.set("scriptDone",[...scriptDone]); if(mode!=="script") setMode("script"); } else if(t.type==="phrase"){ if(mode!=="phrase") setMode("phrase"); $("phraseIn").value=t.key; } target=t; lastTake=null; $("recStatus").textContent="もう一度どうぞ。"; updateTargetUI(); };
 document.querySelectorAll(".mode").forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
-$("setA").onclick=()=>setScriptSet("A"); $("setB").onclick=()=>setScriptSet("B");
+$("setA").onclick=()=>setScriptSet("A"); $("setB").onclick=()=>setScriptSet("B"); $("setC").onclick=()=>setScriptSet("C");
 $("skipBtn").onclick=()=>{ if(target&&target.type==="script"){ const l=SCRIPT[scriptSet]; const i=l.indexOf(target.key); target={type:"script",key:l[(i+1)%l.length]}; updateTargetUI(); } };
 $("fileIn").onchange=async e=>{ const f=e.target.files[0]; e.target.value=""; if(!f) return; if(!target) return toast("先に録るものを選んでください"); try{ handleAudio(await decodeFile(f)); }catch(err){ toast("この音声ファイルは読めませんでした"); } };
 $("segSave").onclick=()=>{ target.keys.forEach((k,i)=>setClip(k,pendingSegs[i],"kana")); $("segBox").hidden=true; toast(target.keys.join("")+" を登録しました"); pendingSegs=null; refreshAll(); };
@@ -943,7 +992,7 @@ const savedText=LS.get("text",null); if(savedText) $("text").value=savedText;
 showView(LS.get("view","speak"));
 setMode("script");
 openDB().then(dbAll).then(rows=>{ rows.forEach(([k,v])=>{ if(v&&v.pcm) clips.set(k,v); }); refreshAll(); });
-window.__koeuchi={localPlan,f0Of,voiceF0,validatePlan,clips,build,render,splitSegments,setClip,tokenize,refreshAll,segmentMoras,handleAudio:p=>handleAudio(p),getTarget:()=>target};
+window.__koeuchi={rebuildUnits,unitIdx,localPlan,f0Of,voiceF0,validatePlan,clips,build,render,splitSegments,setClip,tokenize,refreshAll,segmentMoras,handleAudio:p=>handleAudio(p),getTarget:()=>target};
 })();
 </script>
 <script>if("serviceWorker" in navigator&&location.protocol==="https:")navigator.serviceWorker.register("sw.js").catch(()=>{});</script></body></html>
