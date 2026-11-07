@@ -87,6 +87,7 @@ details summary{cursor:pointer;font-weight:700}
 .chip[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);font-weight:700}
 .prompt{font-family:var(--f-display);font-size:clamp(30px,9vw,52px);line-height:1.3;text-align:center;padding:14px 4px 0;word-break:keep-all;overflow-wrap:anywhere}
 .prompt.rec{color:var(--rec)}
+.prompt.long{font-family:var(--f-body);font-weight:700;font-size:clamp(19px,4.8vw,26px);line-height:1.65;text-align:left;word-break:normal;overflow-wrap:anywhere}
 details summary{padding-block:4px}
 
 .status{font-size:13px;color:var(--muted);min-height:1.4em}
@@ -166,7 +167,7 @@ details summary{padding-block:4px}
       <button class="mode" data-mode="kana" aria-pressed="false">1文字ずつ</button>
     </div>
     <div id="scriptHead" class="row" style="justify-content:space-between">
-      <div class="row"><button class="chip" id="setA" aria-pressed="true">基本 <span id="cntA"></span></button><button class="chip" id="setB" aria-pressed="false">にごる音・ゃゅょ <span id="cntB"></span></button><button class="chip" id="setC" aria-pressed="false">よく使う言葉 <span id="cntC"></span></button></div>
+      <div class="row"><button class="chip" id="setL" aria-pressed="true">長文(おすすめ) <span id="cntL"></span></button><button class="chip" id="setS" aria-pressed="false">短い言葉 <span id="cntS"></span></button></div>
       <button class="btn small" id="skipBtn">とばす</button>
     </div>
     <div id="phraseHead" class="row" hidden><input type="text" id="phraseIn" placeholder="例:おはよう、ありがとう" aria-label="登録する言葉(ひらがな)" style="flex:1;min-width:0"><button class="btn" id="phraseSel">決定</button></div>
@@ -452,11 +453,11 @@ function build(plan,opt){
       const pt=i>0&&sounding(toks[i-1])&&toks[i-1].kind!=="long"?lastMora(toks[i-1]):(i>0&&toks[i-1].t==="っ"?"っ":null);
       const nt=i+1<toks.length&&sounding(toks[i+1])?firstMora(toks[i+1]):null;
       if(tk.kind==="phrase"){ pcm=getPcm(tk.t); lastKana=tk.t; }
-      else if(tk.kind==="chunk"){ pcm=pickUnit(unitIdx.get(tk.t),pt,nt).pcm; lastKana=tk.t; }
+      else if(tk.kind==="chunk"){ pcm=unitPcm(pickUnit(unitIdx.get(tk.t),pt,nt)); lastKana=tk.t; }
       else if(tk.kind==="kana"){
         const own=clips.get(tk.t);
         if(own&&own.src==="single"){ pcm=own.pcm; lastKana=tk.t; }
-        else if(unitIdx.has(tk.t)){ pcm=pickUnit(unitIdx.get(tk.t),pt,nt).pcm; lastKana=tk.t; }
+        else if(unitIdx.has(tk.t)){ pcm=unitPcm(pickUnit(unitIdx.get(tk.t),pt,nt)); lastKana=tk.t; }
         else { const b=resolveKana(tk.t); if(b){ pcm=b.length===1?b[0]:joinPlain(b); lastKana=tk.t; } else missing.push(tk.t); } }
       else if(tk.kind==="long"){ const v=lastKana&&vowelOf(lastKana); const b=v&&getPcm(v); if(b) pcm=b.slice(Math.floor(b.length*0.25)); }
       else if(tk.kind==="gap"){ units.push({sil:Math.round(SR*(tk.t==="っ"||tk.t==="ッ"?0.06:tk.dur*0.8)/rate),label:tk.t}); return; }
@@ -703,14 +704,59 @@ async function saveFile(filename,bytes,type){
 const SCRIPT={
  A:["あいさつ を する","けむり と くも","ねこ の しっぽ","ひなた ぼっこ","ふゆ の よる","へや を でる","ほしい もの","ぬれた せなか","そら に みえる","てがみ を よむ","わかめ の みそしる","まめ を にる","ちいさな えき","きんようび","はるの にわ","おにぎり と ろうそく"],
  B:["げんき な ぞう","ござる ぜんぶ","だいず と ぎんが","ぐらす に ぴざ","べんとう を ぼくが","ぱぴぷぺぽ","じてんしゃ と どうぶつ","ばなな と じゅく","じゃんけん ぎゅうにゅう","きゃべつ と しゃしん","ちゃわん の ちょこ","しゅくだい と きょう","きゅうり と ちゅうい","じょうず な ぎょうざ","びょういん と りょこう","ぎゃく の ひゃく","しょうゆ と りゅう"],
+ L:[
+  {show:"おはようございます。今日は朝から雨が降っていたので、傘をさして駅まで歩きました。",kana:"おはようございます。きょうわ あさから あめが ふっていたので、かさを さして えきまで あるきました。"},
+  {show:"ちょっと待ってください。さっき送ったメールに、大事なことを書き忘れちゃいました。",kana:"ちょっと まってください。さっき おくった めーるに、だいじな ことを かきわすれちゃいました。"},
+  {show:"えっ、本当に？ それはすごいね！ 全然知らなかったよ。",kana:"えっ、ほんとうに？それわ すごいね！ぜんぜん しらなかったよ。"},
+  {show:"明日の会議は十時からなので、資料は今日中にまとめておきます。",kana:"あしたの かいぎわ じゅうじからなので、しりょうわ きょうじゅうに まとめておきます。"},
+  {show:"おなかがすいたから、駅前の新しいお店で、ぎょうざとラーメンを食べようか。",kana:"おなかが すいたから、えきまえの あたらしい おみせで、ぎょうざと らーめんを たべようか。"},
+  {show:"ありがとう、本当に助かったよ。また今度、お礼にジュースでもおごるね。",kana:"ありがとう、ほんとうに たすかったよ。また こんど、おれいに じゅーすでも おごるね。"},
+  {show:"うーん、どうしようかな。もう少し考えてから、決めてもいいですか？",kana:"うーん、どうしようかな。もう すこし かんがえてから、きめても いいですか？"},
+  {show:"昨日、病院の帰りに自転車で公園に寄って、ぶらんこに乗りました。",kana:"きのう、びょういんの かえりに じてんしゃで こうえんに よって、ぶらんこに のりました。"},
+  {show:"すみません、このへんにコンビニはありますか？ ぴったりの場所を探しています。",kana:"すみません、このへんに こんびにわ ありますか？ぴったりの ばしょを さがしています。"},
+  {show:"百円で買ったおもちゃが、びっくりするほどよく動いて、みんなで笑いました。",kana:"ひゃくえんで かった おもちゃが、びっくりするほど よく うごいて、みんなで わらいました。"},
+  {show:"週末は友だちと映画を見て、そのあとチョコのケーキを食べに行きます。",kana:"しゅうまつわ ともだちと えいがを みて、そのあと ちょこの けーきを たべに いきます。"},
+  {show:"寝る前に、ゆっくりお風呂に入って、明日の準備をしておこう。",kana:"ねるまえに、ゆっくり おふろに はいって、あしたの じゅんびを しておこう。"},
+  {show:"ぬいぐるみを抱いた子猫が、ひなたで気持ちよさそうに、むにゃむにゃ寝ています。",kana:"ぬいぐるみを だいた こねこが、ひなたで きもちよさそうに、むにゃむにゃ ねています。"},
+  {show:"上手なピアノと元気な歌に、ぞくぞくするほど感動して、ぽろぽろ泣いちゃった。",kana:"じょうずな ぴあのと げんきな うたに、ぞくぞくするほど かんどうして、ぽろぽろ ないちゃった。"},
+  {show:"キャンプの夜、牛乳とジャムのパンを食べながら、ペンギンの本を読んだ。",kana:"きゃんぷの よる、ぎゅうにゅうと じゃむの ぱんを たべながら、ぺんぎんの ほんを よんだ。"},
+  {show:"急に雨がやんだから、逆に涼しい中を、ぼくたちは駐車場まで散歩しました。",kana:"きゅうに あめが やんだから、ぎゃくに すずしい なかを、ぼくたちわ ちゅうしゃじょうまで さんぽしました。"},
+  {show:"流行りの旅行で、ひょうたん型の島と、恐竜の博物館に行ったよ。",kana:"はやりの りょこうで、ひょうたんがたの しまと、きょうりゅうの はくぶつかんに いったよ。"}
+ ],
  C:["わたしです","ありがとうございます","すみません","ちょっとまって","そうですね","どうしたの","なにしてるの","いいよ","わかった","だいじょうぶ","ほんとうに","またね","おはよう","こんにちわ","たのしかったです","いきましょう","それもいいね","なんでもないよ"]
 };
-let scriptSet="A"; let scriptDone=new Set(LS.get("scriptDone",[])); let mode="script"; let lastTake=null;
-function moraList(s){ const out=[]; s=s.replace(/\s/g,""); for(let i=0;i<s.length;){ if(SMALLY[s[i+1]]){ out.push(s[i]+s[i+1]); i+=2; } else { out.push(s[i]); i++; } } return out; }
+const SETS={L:SCRIPT.L.map(x=>x.kana),S:SCRIPT.A.concat(SCRIPT.B,SCRIPT.C)};
+const SHOW=Object.fromEntries(SCRIPT.L.map(x=>[x.kana,x.show]));
+const isLong=k=>!!SHOW[k];
+let scriptSet="L"; let scriptDone=new Set(LS.get("scriptDone",[])); let mode="script"; let lastTake=null;
+function moraList(s){ const out=[]; s=s.replace(/[^ぁ-ゖー]/g,""); for(let i=0;i<s.length;){ if(SMALLY[s[i+1]]){ out.push(s[i]+s[i+1]); i+=2; } else { out.push(s[i]); i++; } } return out; }
 function normalizeOnly(y){ let ss=0,pk=0; for(const v of y){ ss+=v*v; pk=Math.max(pk,Math.abs(v)); } const rms=Math.sqrt(ss/y.length)||1e-6; const g=Math.min(0.12/rms,0.95/(pk||1)); for(let i=0;i<y.length;i++) y[i]*=g; fade(y,Math.round(SR*0.006)); return y; }
+/* Place mora boundaries by dynamic programming: prefer energy dips, keep each mora near its expected share of the time. */
+function alignBounds(r,a,b,ms){
+  const n=ms.length; if(n<=1) return [a,b];
+  const W=ms.map(m=>m==="っ"?0.75:m==="ー"?0.9:m==="ん"?0.85:m.length===2?1.1:1), tot=W.reduce((x,y)=>x+y,0), exp=W.map(w=>(b-a)*w/tot);
+  let pk=1e-9; for(let j=a;j<b;j++) pk=Math.max(pk,r[j]);
+  const cand=[]; for(let j=a+3;j<b-2;j++) if((r[j]<=r[j-1]&&r[j]<=r[j+1])||j%2===0) cand.push(j);
+  const C=cand.length; const seg=(len,e)=>{ const d=(len-e)/e; return d*d*1.6; }, bc=j=>r[j]/pk*2.5;
+  const equal=()=>{ const o=[a]; for(let i=1;i<n;i++) o.push(Math.round(a+(b-a)*i/n)); o.push(b); return o; };
+  if(C<n-1) return equal();
+  let prev=new Float64Array(C); for(let ci=0;ci<C;ci++) prev[ci]=cand[ci]-a<3?Infinity:seg(cand[ci]-a,exp[0])+bc(cand[ci]);
+  const back=[];
+  for(let k=1;k<n-1;k++){
+    const cur=new Float64Array(C).fill(Infinity), bk=new Int32Array(C).fill(-1);
+    for(let ci=0;ci<C;ci++){ const j=cand[ci], cj=bc(j);
+      for(let pi=ci-1;pi>=0;pi--){ const len=j-cand[pi]; if(len<3) continue; if(len>exp[k]*3+4) break; if(prev[pi]===Infinity) continue;
+        const v=prev[pi]+seg(len,exp[k])+cj; if(v<cur[ci]){ cur[ci]=v; bk[ci]=pi; } } }
+    back.push(bk); prev=cur;
+  }
+  let best=Infinity,bi=-1; for(let ci=0;ci<C;ci++){ if(prev[ci]===Infinity||b-cand[ci]<3) continue; const v=prev[ci]+seg(b-cand[ci],exp[n-1]); if(v<best){best=v;bi=ci;} }
+  if(bi<0) return equal();
+  const inner=[cand[bi]]; let ci=bi; for(let k=back.length-1;k>=0;k--){ ci=back[k][ci]; if(ci<0) return equal(); inner.push(cand[ci]); }
+  return [a,...inner.reverse(),b];
+}
 /* Japanese is mora-timed: split each spoken word into its moras, snapping cuts to energy dips. */
 function segmentMoras(x,text){
-  const words=text.split(/\s+/).filter(Boolean).map(moraList);
+  const words=(/[、。？！?!,]/.test(text)?text.split(/[、。？！?!,]+/):text.split(/\s+/)).map(moraList).filter(w=>w.length);
   const fr=Math.round(SR*0.005); const raw=rmsFrames(x,fr); const r=raw.map((v,i)=>((raw[i-1]??v)+v+(raw[i+1]??v))/3);
   if(!r.length) return [];
   const peak=Math.max(...r), floor=percentile(r,0.1), th=floor+(peak-floor)*0.08;
@@ -719,12 +765,11 @@ function segmentMoras(x,text){
   if(st>=0) regs.push([st,r.length]);
   const merged=[]; for(const g of regs){ if(merged.length&&g[0]-merged[merged.length-1][1]<30) merged[merged.length-1][1]=g[1]; else merged.push(g.slice()); }
   const voiced=merged.filter(g=>g[1]-g[0]>=10); if(!voiced.length) return [];
+  while(voiced.length>words.length&&words.length>1){ let gi=1,gv=Infinity; for(let i=1;i<voiced.length;i++){ const g=voiced[i][0]-voiced[i-1][1]; if(g<gv){gv=g;gi=i;} } voiced[gi-1][1]=voiced[gi][1]; voiced.splice(gi,1); }
   const chunks=voiced.length===words.length?voiced.map((g,i)=>({a:g[0],b:g[1],ms:words[i],w:i})):[{a:voiced[0][0],b:voiced[voiced.length-1][1],ms:words.flat(),w:0}];
   const out=[]; const pad=Math.round(SR*0.012);
   for(const c of chunks){
-    const n=c.ms.length, L=c.b-c.a, bounds=[c.a];
-    for(let i=1;i<n;i++){ const nom=c.a+L*i/n, w=L/n*0.35; let best=Math.round(nom), bv=Infinity; for(let j=Math.max(bounds[i-1]+3,Math.round(nom-w)); j<=Math.min(c.b-3,Math.round(nom+w)); j++){ if(r[j]<bv){bv=r[j];best=j;} } bounds.push(best); }
-    bounds.push(c.b);
+    const bounds=alignBounds(r,c.a,c.b,c.ms);
     c.ms.forEach((m,i)=>{ const s=Math.max(0,bounds[i]*fr-pad), e=Math.min(x.length,bounds[i+1]*fr+pad); if(e-s>SR*0.03) out.push({m,pcm:normalizeOnly(x.slice(s,e)),s,e,w:c.w}); });
   }
   return out;
@@ -737,7 +782,7 @@ function learnFrom(pcm,text){
 
 /* ---------- unit inventory: every mora and 2-6 mora run cut from natural recordings, with its context ---------- */
 const unitIdx=new Map(); let unitRev=-1;
-function scriptSpaced(key){ for(const p of SCRIPT.A.concat(SCRIPT.B,SCRIPT.C)) if(p.replace(/\s/g,"")===key) return p; return key; }
+function scriptSpaced(key){ for(const p of SETS.L.concat(SETS.S)) if(p.replace(/\s/g,"")===key) return p; return key; }
 function rebuildUnits(){
   if(unitRev===clipRev) return; unitRev=clipRev; unitIdx.clear();
   const add=(k,inst)=>{ let a=unitIdx.get(k); if(!a) unitIdx.set(k,a=[]); a.push(inst); };
@@ -751,11 +796,12 @@ function rebuildUnits(){
         const key=run.map(g=>g.m).join(""); if(key==="っ") continue;
         const prev=i>0&&segs[i-1].w===segs[i].w?segs[i-1].m:null;
         const nx=i+L<segs.length&&segs[i+L].w===segs[i].w?segs[i+L].m:null;
-        add(key,{pcm:L===1?run[0].pcm:normalizeOnly(c.pcm.slice(run[0].s,run[L-1].e)),prev,next:nx,L});
+        add(key,L===1?{pcm:run[0].pcm,prev,next:nx,L}:{src:c.pcm,s:run[0].s,e:run[L-1].e,prev,next:nx,L});
       }
     }
   }
 }
+function unitPcm(u){ if(!u.pcm) u.pcm=normalizeOnly(u.src.slice(u.s,u.e)); return u.pcm; }
 function pickUnit(list,prev,next){
   let best=list[0],bs=-1;
   for(const u of list){ let sc=0;
@@ -781,7 +827,7 @@ async function startRec(){
     if(vad.noise.length<3){ vad.noise.push(rms); return; }
     const th=Math.max(0.012,Math.min(...vad.noise)*3.5);
     if(rms>th){ vad.speech=true; vad.silent=0; } else if(vad.speech) vad.silent+=blockSec;
-    if(($("autoStop").checked&&vad.speech&&vad.silent>=1.0)||vad.total>20) setTimeout(()=>rec&&rec.proc===proc&&stopRec(),0);
+    if(($("autoStop").checked&&vad.speech&&vad.silent>=(target&&isLong(target.key)?1.6:1.0))||vad.total>40) setTimeout(()=>rec&&rec.proc===proc&&stopRec(),0);
   };
   const mute=c.createGain(); mute.gain.value=0; srcN.connect(proc); proc.connect(mute); mute.connect(c.destination);
   live.peaks=[]; rec={stream,srcN,proc,chunks,rate:c.sampleRate};
@@ -826,18 +872,17 @@ function showSegs(){
   $("segSave").disabled=segs.length!==keys.length;
 }
 function nextPrompt(from){
-  const list=SCRIPT[scriptSet]; let i=from??(target&&target.type==="script"?list.indexOf(target.key)+1:0);
+  const list=SETS[scriptSet]; let i=from??(target&&target.type==="script"?list.indexOf(target.key)+1:0);
   let k=list.slice(i).find(p=>!scriptDone.has(p))||list.find(p=>!scriptDone.has(p));
-  if(!k&&scriptSet==="A"&&SCRIPT.B.some(p=>!scriptDone.has(p))){ setScriptSet("B"); toast("基本の台本が終わりました。続けて仕上げもどうぞ"); return; }
-  if(!k&&scriptSet==="B"&&SCRIPT.C.some(p=>!scriptDone.has(p))){ setScriptSet("C"); toast("続けて、よく使う言葉を録るともっと自然になります"); return; }
+
   if(!k){ target=null; updateTargetUI(); $("prompt").textContent="ぜんぶ録り終わりました"; $("recTarget").textContent="「しゃべる」で試してみてください。録り直したい言葉はセットを選び直すと出てきます。"; return; }
   target={type:"script",key:k}; updateTargetUI();
 }
-function setScriptSet(s){ scriptSet=s; ["A","B","C"].forEach(x=>$("set"+x).setAttribute("aria-pressed",String(s===x))); target=null; nextPrompt(0); }
+function setScriptSet(s){ scriptSet=s; ["L","S"].forEach(x=>$("set"+x).setAttribute("aria-pressed",String(s===x))); target=null; nextPrompt(0); }
 function setMode(m){
   mode=m; document.querySelectorAll(".mode").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===m)));
   $("scriptHead").hidden=m!=="script"; $("phraseHead").hidden=m!=="phrase"; $("segBox").hidden=true; $("recStatus").textContent="";
-  $("recHelp").textContent={script:"表示された言葉を、ふだんの速さではっきり読んでください。言葉と言葉の間を少しあけると、1文字ずつにうまく切り分けられます。基本の16個でひらがながそろいます。「よく使う言葉」まで録ると、録った言葉から2〜4音のかたまりを切り出して使うので、つなぎ目が減って自然になります。",
+  $("recHelp").textContent={script:"表示された文を、ふだん話す感じで読んでください。「、」や「。」で軽く息つぎすると、うまく切り分けられます。長文17本でひらがな・にごる音・小さい「ゃゅょ」・「っ」「ー」がひととおりそろい、文の中の音のつながりや抑揚もそのまま覚えます。話し終わって少し黙ると自動で止まります。",
     phrase:"よく使う言葉や短い文をひらがなで入れて「決定」、それから録音します。その言葉をしゃべるときは丸ごと使い、含まれている文字も覚えます。",
     kana:"下の「文字ごとに確認する」を開いて、気になる文字をタップして録り直せます。行の見出しの「行ごと録音」で「か、き、く、け、こ」と区切って一気に録ることもできます。"}[m];
   if(m==="script") nextPrompt(0);
@@ -865,10 +910,12 @@ function updateTargetUI(){
   document.querySelectorAll(".k.sel").forEach(e=>e.classList.remove("sel"));
   $("playClipBtn").disabled=!lastTake; $("delClipBtn").disabled=!lastTake;
   $("recBtn").disabled=!target;
-  const cA=SCRIPT.A.filter(p=>scriptDone.has(p)).length, cB=SCRIPT.B.filter(p=>scriptDone.has(p)).length;
-  $("cntA").textContent=cA+"/"+SCRIPT.A.length; $("cntB").textContent=cB+"/"+SCRIPT.B.length; $("cntC").textContent=SCRIPT.C.filter(p=>scriptDone.has(p)).length+"/"+SCRIPT.C.length;
+  ["L","S"].forEach(x=>$("cnt"+x).textContent=SETS[x].filter(p=>scriptDone.has(p)).length+"/"+SETS[x].length);
   if(!target){ if(mode==="phrase"){ $("prompt").textContent="……"; $("recTarget").textContent="上に言葉を入れて「決定」を押してください"; } return; }
-  if(target.type==="script"){ $("prompt").textContent=target.key; const list=SCRIPT[scriptSet]; $("recTarget").textContent=(list.indexOf(target.key)+1)+" / "+list.length+"  この言葉を読んでください"; }
+  $("prompt").classList.toggle("long",target.type==="script"&&isLong(target.key));
+  if(target.type==="script"){ const list=SETS[scriptSet]; const pos=(list.indexOf(target.key)+1)+" / "+list.length;
+    if(isLong(target.key)){ $("prompt").textContent=SHOW[target.key]; $("recTarget").textContent=pos+"  よみ:"+target.key; }
+    else { $("prompt").textContent=target.key; $("recTarget").textContent=pos+"  この言葉を読んでください"; } }
   else if(target.type==="kana"){ const el=document.querySelector('.k[data-k="'+target.key+'"]'); el&&el.classList.add("sel"); $("prompt").textContent=target.key; $("recTarget").textContent="この1文字だけを言ってください"; }
   else if(target.type==="row"){ $("prompt").textContent=target.keys.join("、"); $("recTarget").textContent="一音ずつ間をあけて読んでください"; }
   else { $("prompt").textContent=target.key; $("recTarget").textContent="この言葉を読んでください"; }
@@ -974,8 +1021,8 @@ $("recBtn").onclick=()=>rec?stopRec():startRec();
 $("playClipBtn").onclick=()=>{ if(lastTake) playPcm(lastTake.pcm); };
 $("delClipBtn").onclick=()=>{ if(!lastTake) return; const t=lastTake.target; if(t.type==="script"){ scriptDone.delete(t.key); LS.set("scriptDone",[...scriptDone]); if(mode!=="script") setMode("script"); } else if(t.type==="phrase"){ if(mode!=="phrase") setMode("phrase"); $("phraseIn").value=t.key; } target=t; lastTake=null; $("recStatus").textContent="もう一度どうぞ。"; updateTargetUI(); };
 document.querySelectorAll(".mode").forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
-$("setA").onclick=()=>setScriptSet("A"); $("setB").onclick=()=>setScriptSet("B"); $("setC").onclick=()=>setScriptSet("C");
-$("skipBtn").onclick=()=>{ if(target&&target.type==="script"){ const l=SCRIPT[scriptSet]; const i=l.indexOf(target.key); target={type:"script",key:l[(i+1)%l.length]}; updateTargetUI(); } };
+$("setL").onclick=()=>setScriptSet("L"); $("setS").onclick=()=>setScriptSet("S");
+$("skipBtn").onclick=()=>{ if(target&&target.type==="script"){ const l=SETS[scriptSet]; const i=l.indexOf(target.key); target={type:"script",key:l[(i+1)%l.length]}; updateTargetUI(); } };
 $("fileIn").onchange=async e=>{ const f=e.target.files[0]; e.target.value=""; if(!f) return; if(!target) return toast("先に録るものを選んでください"); try{ handleAudio(await decodeFile(f)); }catch(err){ toast("この音声ファイルは読めませんでした"); } };
 $("segSave").onclick=()=>{ target.keys.forEach((k,i)=>setClip(k,pendingSegs[i],"kana")); $("segBox").hidden=true; toast(target.keys.join("")+" を登録しました"); pendingSegs=null; refreshAll(); };
 $("segCancel").onclick=()=>{ $("segBox").hidden=true; pendingSegs=null; };
@@ -992,7 +1039,7 @@ const savedText=LS.get("text",null); if(savedText) $("text").value=savedText;
 showView(LS.get("view","speak"));
 setMode("script");
 openDB().then(dbAll).then(rows=>{ rows.forEach(([k,v])=>{ if(v&&v.pcm) clips.set(k,v); }); refreshAll(); });
-window.__koeuchi={rebuildUnits,unitIdx,localPlan,f0Of,voiceF0,validatePlan,clips,build,render,splitSegments,setClip,tokenize,refreshAll,segmentMoras,handleAudio:p=>handleAudio(p),getTarget:()=>target};
+window.__koeuchi={segmentMoras2:(x,t)=>segmentMoras(x,t),SETS,rebuildUnits,unitIdx,localPlan,f0Of,voiceF0,validatePlan,clips,build,render,splitSegments,setClip,tokenize,refreshAll,segmentMoras,handleAudio:p=>handleAudio(p),getTarget:()=>target};
 })();
 </script>
 <script>if("serviceWorker" in navigator&&location.protocol==="https:")navigator.serviceWorker.register("sw.js").catch(()=>{});</script></body></html>
