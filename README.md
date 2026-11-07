@@ -2,6 +2,8 @@
 
 打った文字を自分の声でしゃべるWebアプリ(PWA)。
 
+公開URL: https://yama1223haya-a11y.github.io/koeuchi/
+
 - `index.html` … アプリ本体(この1ファイルをブラウザで開けば動きます)
 - `manifest.webmanifest` / `sw.js` / `icon.svg` … ホーム画面に追加・オフライン用
 - `app.html` … claude.ai のアーティファクト公開用(中身は同じ)
