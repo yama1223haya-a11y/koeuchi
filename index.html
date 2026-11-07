@@ -1,0 +1,949 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg"><link rel="apple-touch-icon" href="icon.svg"><meta name="theme-color" content="#2747d0"><meta name="apple-mobile-web-app-capable" content="yes"><style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style></head><body><title>コエウチ</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: one-column "talk box" — a big text panel with a speak key, kana keyboard for voice registration, a mixer strip for effects. */
+:root{
+  --bg:#eceff3; --surface:#ffffff; --sunken:#e1e6ec; --ink:#141c26; --muted:#56626f; --line:#cdd5de;
+  --accent:#2747d0; --accent-ink:#ffffff; --rec:#d93a3f; --ok:#16855f; --warn:#a86400;
+  --f-display:"Dela Gothic One","Hiragino Sans","Yu Gothic",sans-serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic","Noto Sans JP",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --r:12px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e1319; --surface:#17202a; --sunken:#0a0f14; --ink:#e5ebf1; --muted:#97a4b2; --line:#2a3644;
+  --accent:#7f97ff; --accent-ink:#0b1020; --rec:#ff6d70; --ok:#4cc79a; --warn:#f0b04e; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1319; --surface:#17202a; --sunken:#0a0f14; --ink:#e5ebf1; --muted:#97a4b2; --line:#2a3644;
+  --accent:#7f97ff; --accent-ink:#0b1020; --rec:#ff6d70; --ok:#4cc79a; --warn:#f0b04e; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{background:var(--bg);color:var(--ink)}
+body{font-family:var(--f-body);font-size:15px;line-height:1.6;margin:0}
+.wrap{max-width:760px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 96px;display:flex;flex-direction:column;gap:16px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:8px;display:flex;flex-direction:column;gap:10px}
+.brand{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.brand h1{font-family:var(--f-display);font-weight:400;font-size:26px;margin:0;letter-spacing:.02em}
+.brand p{margin:0;color:var(--muted);font-size:13px}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);background:var(--sunken);border-radius:999px;padding:4px;gap:4px}
+.tabs button{border:0;background:transparent;color:var(--muted);font:inherit;font-weight:700;padding:8px 4px;border-radius:999px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+section.view{display:flex;flex-direction:column;gap:14px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.panel h2{margin:0;font-size:16px}
+.panel h2 small{font-weight:400;color:var(--muted);font-size:13px;margin-left:6px}
+textarea,input[type=text]{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px}
+textarea{font-size:20px;line-height:1.5;min-height:120px;resize:vertical}
+textarea:focus,input:focus,button:focus-visible,select:focus{outline:2px solid var(--accent);outline-offset:2px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{font:inherit;font-weight:700;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:10px 14px;cursor:pointer;min-height:44px}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.big{font-size:18px;padding:14px 22px;flex:1;min-width:160px}
+.btn.rec{background:var(--rec);border-color:var(--rec);color:#fff}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.small{min-height:34px;padding:6px 10px;font-size:13px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:6px 12px;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.chip .x{color:var(--muted);font-size:12px}
+.note{font-size:13px;color:var(--muted);margin:0}
+.notice{border-radius:10px;padding:10px 12px;font-size:14px;background:var(--sunken);border-left:4px solid var(--warn)}
+.notice.ok{border-left-color:var(--ok)}
+.screen{font-family:var(--f-display);font-size:clamp(22px,6vw,40px);line-height:1.35;min-height:1.4em;word-break:break-all;padding:8px 4px}
+.screen span{color:var(--muted);transition:color .08s}
+.screen span.on{color:var(--accent)}
+.screen span.miss{color:var(--rec);text-decoration:underline wavy}
+.screen span.done{color:var(--ink)}
+.meter{height:8px;background:var(--sunken);border-radius:99px;overflow:hidden}
+.meter i{display:block;height:100%;width:0;background:var(--ok);transition:width .05s}
+.kgrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.kgroup{display:flex;flex-direction:column;gap:6px}
+.kgroup-h{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;color:var(--muted);font-weight:700;margin-top:6px}
+.k{font-family:var(--f-body);font-size:20px;font-weight:700;aspect-ratio:1.25;max-width:100%;border-radius:10px;border:1px dashed var(--line);background:var(--bg);color:var(--muted);cursor:pointer;position:relative}
+.k.has{border-style:solid;border-color:var(--ok);color:var(--ink);background:var(--surface)}
+.k.has::after{content:"";position:absolute;right:6px;top:6px;width:7px;height:7px;border-radius:50%;background:var(--ok)}
+.k.sel{outline:3px solid var(--accent);outline-offset:1px}
+.k.blank{visibility:hidden}
+.progress{font-family:var(--f-mono);font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.bar{height:6px;background:var(--sunken);border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent)}
+.segs{display:flex;gap:6px;flex-wrap:wrap}
+.seg{font:inherit;font-weight:700;font-size:18px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:8px 12px;cursor:pointer}
+.ctrl{display:grid;grid-template-columns:7.5em minmax(0,1fr) 4.2em;gap:10px;align-items:center}
+.ctrl label{font-size:14px;font-weight:700}
+.ctrl output{font-family:var(--f-mono);font-size:13px;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.presets{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px}
+.preset{font:inherit;font-weight:700;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:10px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
+.preset small{font-weight:400;color:var(--muted);font-size:11px}
+.preset[aria-pressed="true"]{border-color:var(--accent);background:var(--surface);box-shadow:inset 0 0 0 1px var(--accent)}
+details summary{cursor:pointer;font-weight:700}
+.modes{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--sunken);border-radius:10px;padding:4px}
+.mode{border:0;background:transparent;color:var(--muted);font:inherit;font-weight:700;padding:8px 4px;border-radius:8px;cursor:pointer}
+.mode[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.chip[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);font-weight:700}
+.prompt{font-family:var(--f-display);font-size:clamp(30px,9vw,52px);line-height:1.3;text-align:center;padding:14px 4px 0;word-break:keep-all;overflow-wrap:anywhere}
+.prompt.rec{color:var(--rec)}
+details summary{padding-block:4px}
+
+.status{font-size:13px;color:var(--muted);min-height:1.4em}
+.status:empty{display:none}
+.view .wave{min-height:96px}
+.wave{display:block;width:100%;height:110px;border-radius:10px;background:var(--sunken)}
+.rate label{font-weight:700}
+.rate-presets .chip{padding:4px 12px;font-size:13px}
+.rate-presets .chip[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);font-weight:700}
+.monitor{position:fixed;left:0;right:0;bottom:0;z-index:15;display:flex;align-items:center;gap:10px;background:var(--surface);border-top:1px solid var(--line);padding:8px max(16px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));box-shadow:0 -4px 16px rgba(0,0,0,.12)}
+.monitor canvas{flex:1;min-width:0;height:48px;display:block;border-radius:8px}
+.mon-label{font-size:12px;font-weight:700;color:var(--rec)}
+.mon-time{font-family:var(--f-mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.agent{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;padding:10px 12px;border-radius:10px;background:var(--sunken)}
+.agent .switch{font-size:14px;font-weight:700;display:inline-flex;gap:6px;align-items:center}
+.agent .note{flex-basis:100%;min-width:0;overflow-wrap:anywhere}
+#aiStatus[data-state="busy"]{color:var(--accent)}
+#aiStatus[data-state="ai"]{color:var(--ok)}
+
+#recBtn{flex:2;min-width:120px}
+#playClipBtn,#delClipBtn{flex:1;padding-inline:8px;white-space:nowrap}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;z-index:20;max-width:90vw}
+@media (max-width:480px){.ctrl{grid-template-columns:6.2em minmax(0,1fr) 3.6em}.k{font-size:18px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="brand"><h1>コエウチ</h1><p>打った文字を、あなたの声でしゃべる</p></div>
+  <nav class="tabs" role="tablist">
+    <button role="tab" id="tab-speak" aria-selected="true" data-view="speak">しゃべる</button>
+    <button role="tab" id="tab-voice" aria-selected="false" data-view="voice">声を登録</button>
+    <button role="tab" id="tab-fx" aria-selected="false" data-view="fx">声の加工</button>
+  </nav>
+</header>
+
+<!-- しゃべる -->
+<section class="view" id="view-speak">
+  <div class="notice" id="voiceState">声を読み込んでいます…</div>
+  <div class="panel">
+    <textarea id="text" aria-label="しゃべらせる文字">こんにちは。きょうは いい てんき ですね。</textarea>
+    <div class="row">
+      <button class="btn primary big" id="speakBtn">▶ しゃべる</button>
+      <button class="btn" id="stopBtn" disabled>■ 止める</button>
+      <button class="btn" id="saveWavBtn">音声を保存</button>
+    </div>
+    <div class="row">
+      <button class="btn small" id="kanjiBtn">漢字をよみがなに変換</button>
+      <button class="btn small" id="clearBtn">消す</button>
+      <span class="note" id="fxBadge"></span>
+    </div>
+    <div class="ctrl rate"><label for="rate">読む速さ</label><input type="range" id="rate" min="0.6" max="3" step="0.05"><output id="rateOut"></output></div>
+    <div class="row rate-presets"><button class="chip" data-rate="1">ゆっくり</button><button class="chip" data-rate="1.4">ふつう</button><button class="chip" data-rate="1.9">はやい</button><button class="chip" data-rate="2.5">早口</button></div>
+    <div class="agent">
+      <label class="switch"><input type="checkbox" id="aiOn" checked> AIエージェント</label>
+      <label class="switch"><input type="checkbox" id="smoothOn" checked> つなぎ目・高さをそろえる</label>
+      <p class="note" id="aiStatus" data-state="">しゃべるたびに、AIが読み方・区切り・抑揚・速さを調整します</p>
+    </div>
+    <div class="screen" id="screen" aria-live="polite"></div>
+    <canvas class="wave" id="wave" hidden aria-label="しゃべった音の波形"></canvas>
+    <div class="status" id="speakStatus"></div>
+  </div>
+  <div class="panel">
+    <h2>よく使う言葉 <small>タップで入力、長押しで削除</small></h2>
+    <div class="chips" id="chips"></div>
+    <div class="row"><button class="btn small" id="addChip">いまの文を登録</button><label class="note"><input type="checkbox" id="autoSpeak" checked> タップしたらすぐしゃべる</label></div>
+  </div>
+  <p class="note">AIエージェントがオンなら、漢字や英字もそのまま読めます。オフのときや使えないときは、ひらがな・カタカナ・数字を読み、漢字は「漢字をよみがなに変換」でひらがなにしてからしゃべります。</p>
+</section>
+
+<!-- 声を登録 -->
+<section class="view" id="view-voice" hidden>
+  <div class="panel">
+    <div class="modes" role="tablist" aria-label="登録のしかた">
+      <button class="mode" data-mode="script" aria-pressed="true">かんたん登録</button>
+      <button class="mode" data-mode="phrase" aria-pressed="false">好きな言葉</button>
+      <button class="mode" data-mode="kana" aria-pressed="false">1文字ずつ</button>
+    </div>
+    <div id="scriptHead" class="row" style="justify-content:space-between">
+      <div class="row"><button class="chip" id="setA" aria-pressed="true">基本 <span id="cntA"></span></button><button class="chip" id="setB" aria-pressed="false">にごる音・ゃゅょ <span id="cntB"></span></button></div>
+      <button class="btn small" id="skipBtn">とばす</button>
+    </div>
+    <div id="phraseHead" class="row" hidden><input type="text" id="phraseIn" placeholder="例:おはよう、ありがとう" aria-label="登録する言葉(ひらがな)" style="flex:1;min-width:0"><button class="btn" id="phraseSel">決定</button></div>
+    <div class="prompt" id="prompt">あいさつ を する</div>
+    <p class="note" id="recTarget" style="text-align:center">この言葉を読んでください</p>
+    <div class="notice" id="micNotice" hidden></div>
+    <canvas class="wave" id="recWave" aria-label="録音の波形"></canvas>
+    <div class="row">
+      <button class="btn rec big" id="recBtn">● 録音</button>
+      <button class="btn" id="playClipBtn" disabled>▶ 聞く</button>
+      <button class="btn" id="delClipBtn" disabled>録り直す</button>
+    </div>
+    <div class="status" id="recStatus"></div>
+    <div id="segBox" class="panel" style="background:var(--bg)" hidden>
+      <h2>区切りの確認 <small id="segInfo"></small></h2>
+      <div class="segs" id="segs"></div>
+      <div class="row"><button class="btn primary" id="segSave">この区切りで保存</button><button class="btn" id="segCancel">やり直す</button></div>
+    </div>
+    <div class="row">
+      <label class="note"><input type="checkbox" id="autoStop" checked> 話し終わったら自動で止める</label>
+      <label class="btn small" for="fileIn">音声ファイルから読み込む</label>
+      <input type="file" id="fileIn" accept="audio/*" capture hidden>
+    </div>
+    <p class="note" id="recHelp"></p>
+  </div>
+
+  <div class="panel">
+    <div class="row" style="justify-content:space-between"><h2>そろった文字</h2><span class="progress" id="progressTxt"></span></div>
+    <div class="bar"><i id="progressBar" style="width:0"></i></div>
+    <details id="gridBox"><summary>文字ごとに確認する(タップで1文字ずつ録り直し)</summary><div id="kana"></div></details>
+  </div>
+
+  <div class="panel">
+    <h2>登録した言葉 <small>この言葉をしゃべるときは丸ごと使います</small></h2>
+    <div class="chips" id="phraseList"></div>
+    <p class="note" id="phraseEmpty">「好きな言葉」で録った言葉がここに並びます。</p>
+  </div>
+
+  <div class="panel">
+    <h2>声データの持ち運び</h2>
+    <p class="note">声はこの端末のブラウザの中だけに保存されます。PCとスマホで同じ声を使うには、書き出したファイルをもう一方で読み込んでください。</p>
+    <div class="row">
+      <button class="btn" id="exportBtn">声データを書き出す</button>
+      <label class="btn" for="importIn">声データを読み込む</label>
+      <input type="file" id="importIn" accept=".json,application/json" hidden>
+      <button class="btn" id="wipeBtn">すべて削除</button>
+    </div>
+    <div class="row" id="wipeConfirm" hidden><span class="note">登録した声をすべて消します。</span><button class="btn rec small" id="wipeYes">消す</button><button class="btn small" id="wipeNo">やめる</button></div>
+  </div>
+</section>
+
+<!-- 声の加工 -->
+<section class="view" id="view-fx" hidden>
+  <div class="panel">
+    <h2>プリセット</h2>
+    <div class="presets" id="presets"></div>
+  </div>
+  <div class="panel">
+    <h2>調整</h2>
+    <div id="ctrls" style="display:flex;flex-direction:column;gap:10px"></div>
+    <canvas class="wave" id="fxWave" hidden aria-label="加工後の波形"></canvas>
+    <div class="row"><button class="btn primary" id="fxTry">▶ 試しにしゃべる</button><button class="btn" id="fxReset">元に戻す</button></div>
+    <p class="note">「原音をまぜる」を上げると、加工した声に元の声を重ねて出します。「ハモり」は高さを変えた声をもう一つ足します。</p>
+  </div>
+</section>
+</div>
+<div class="monitor" id="monitor" hidden><span class="mon-label">出力中</span><canvas id="scope" aria-label="出力中の波形"></canvas><span class="mon-time" id="monTime"></span></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(()=>{
+"use strict";
+const $=id=>document.getElementById(id);
+const SR=24000;
+let actx=null;
+function ctx(){ if(!actx){ actx=new (window.AudioContext||window.webkitAudioContext)(); } if(actx.state==="suspended") actx.resume(); return actx; }
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,2600); }
+const LS={get(k,d){try{const v=localStorage.getItem("koeuchi:"+k);return v==null?d:JSON.parse(v);}catch(e){return d;}},set(k,v){try{localStorage.setItem("koeuchi:"+k,JSON.stringify(v));}catch(e){}}};
+
+/* ---------- kana tables ---------- */
+const GROUPS=[
+ {name:"あ行",k:"あいうえお",core:1},{name:"か行",k:"かきくけこ",core:1},{name:"さ行",k:"さしすせそ",core:1},{name:"た行",k:"たちつてと",core:1},{name:"な行",k:"なにぬねの",core:1},
+ {name:"は行",k:"はひふへほ",core:1},{name:"ま行",k:"まみむめも",core:1},{name:"や行",k:"や_ゆ_よ",core:1},{name:"ら行",k:"らりるれろ",core:1},{name:"わ行",k:"わ_を_ん",core:1},
+ {name:"が行",k:"がぎぐげご"},{name:"ざ行",k:"ざじずぜぞ"},{name:"だ行",k:"だぢづでど"},{name:"ば行",k:"ばびぶべぼ"},{name:"ぱ行",k:"ぱぴぷぺぽ"},
+ {name:"きゃ",k:["きゃ","きゅ","きょ"]},{name:"しゃ",k:["しゃ","しゅ","しょ"]},{name:"ちゃ",k:["ちゃ","ちゅ","ちょ"]},{name:"にゃ",k:["にゃ","にゅ","にょ"]},{name:"ひゃ",k:["ひゃ","ひゅ","ひょ"]},
+ {name:"みゃ",k:["みゃ","みゅ","みょ"]},{name:"りゃ",k:["りゃ","りゅ","りょ"]},{name:"ぎゃ",k:["ぎゃ","ぎゅ","ぎょ"]},{name:"じゃ",k:["じゃ","じゅ","じょ"]},{name:"びゃ",k:["びゃ","びゅ","びょ"]},{name:"ぴゃ",k:["ぴゃ","ぴゅ","ぴょ"]}
+];
+GROUPS.forEach(g=>{ g.list=Array.isArray(g.k)?g.k:[...g.k]; g.keys=g.list.filter(c=>c!=="_"); });
+const ALL_KEYS=GROUPS.flatMap(g=>g.keys);
+const CORE_KEYS=GROUPS.filter(g=>g.core).flatMap(g=>g.keys);
+const VOWEL={};
+"あかさたなはまやらわがざだばぱ".split("").forEach(c=>VOWEL[c]="あ");
+"いきしちにひみりぎじぢびぴ".split("").forEach(c=>VOWEL[c]="い");
+"うくすつぬふむゆるぐずづぶぷゔ".split("").forEach(c=>VOWEL[c]="う");
+"えけせてねへめれげぜでべぺ".split("").forEach(c=>VOWEL[c]="え");
+"おこそとのほもよろをごぞどぼぽ".split("").forEach(c=>VOWEL[c]="お");
+VOWEL["ゃ"]="あ";VOWEL["ゅ"]="う";VOWEL["ょ"]="お";VOWEL["ん"]="ん";
+const DAKU={};
+const pairs=[["がぎぐげご","かきくけこ"],["ざじずぜぞ","さしすせそ"],["だぢづでど","たちつてと"],["ばびぶべぼ","はひふへほ"],["ぱぴぷぺぽ","はひふへほ"]];
+pairs.forEach(([a,b])=>[...a].forEach((c,i)=>DAKU[c]=b[i]));
+const ALIAS={"ぁ":"あ","ぃ":"い","ぅ":"う","ぇ":"え","ぉ":"お","ゐ":"い","ゑ":"え","ゔ":"ぶ","ゎ":"わ","ゕ":"か","ゖ":"け","ぢ":"じ","づ":"ず"};
+const SMALLY={"ゃ":"や","ゅ":"ゆ","ょ":"よ"};
+
+function toHira(s){ return s.replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60)).replace(/[Ａ-Ｚａ-ｚ０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)); }
+
+/* numbers -> kana */
+function numKana(n){
+  if(n===0) return "ぜろ";
+  const d=["","いち","に","さん","よん","ご","ろく","なな","はち","きゅう"];
+  function under1e4(x){
+    let s="";const th=Math.floor(x/1000),h=Math.floor(x/100)%10,t=Math.floor(x/10)%10,o=x%10;
+    if(th) s+=({1:"せん",3:"さんぜん",8:"はっせん"})[th]||d[th]+"せん";
+    if(h) s+=({1:"ひゃく",3:"さんびゃく",6:"ろっぴゃく",8:"はっぴゃく"})[h]||d[h]+"ひゃく";
+    if(t) s+=(t===1?"":d[t])+"じゅう";
+    if(o) s+=d[o];
+    return s;
+  }
+  let s="";const oku=Math.floor(n/1e8),man=Math.floor(n/1e4)%1e4,r=n%1e4;
+  if(oku) s+=under1e4(oku)+"おく"; if(man) s+=under1e4(man)+"まん"; if(r) s+=under1e4(r);
+  return s;
+}
+function normalizeText(s){
+  s=toHira(s);
+  s=s.replace(/\d+/g,m=>m.length>9?[...m].map(x=>numKana(+x)).join(""):numKana(parseInt(m,10)));
+  return s;
+}
+
+/* ---------- storage (IndexedDB with memory fallback) ---------- */
+const clips=new Map(); // key -> {pcm:Float32Array, kind}
+let idb=null;
+function openDB(){ return new Promise(res=>{ try{ const r=indexedDB.open("koeuchi",1); r.onupgradeneeded=()=>r.result.createObjectStore("clips"); r.onsuccess=()=>{idb=r.result;res();}; r.onerror=()=>res(); }catch(e){res();} }); }
+function dbAll(){ return new Promise(res=>{ if(!idb) return res([]); try{ const out=[]; const tx=idb.transaction("clips"); const st=tx.objectStore("clips"); const rq=st.openCursor(); rq.onsuccess=()=>{const c=rq.result; if(c){out.push([c.key,c.value]);c.continue();} else res(out);}; rq.onerror=()=>res(out);}catch(e){res([]);} }); }
+function dbPut(k,v){ try{ if(idb) idb.transaction("clips","readwrite").objectStore("clips").put(v,k); }catch(e){} }
+function dbDel(k){ try{ if(idb) idb.transaction("clips","readwrite").objectStore("clips").delete(k); }catch(e){} }
+function dbClear(){ try{ if(idb) idb.transaction("clips","readwrite").objectStore("clips").clear(); }catch(e){} }
+function setClip(k,pcm,kind,src){ const v={pcm,kind:kind||(ALL_KEYS.includes(k)?"kana":"phrase"),src:src||"single",t:Date.now()}; clips.set(k,v); dbPut(k,v); clipRev++; }
+function delClip(k){ clips.delete(k); dbDel(k); clipRev++; }
+
+/* ---------- DSP helpers ---------- */
+function rmsFrames(x,frame){ const n=Math.floor(x.length/frame), out=new Float32Array(n); for(let i=0;i<n;i++){let s=0;for(let j=0;j<frame;j++){const v=x[i*frame+j];s+=v*v;} out[i]=Math.sqrt(s/frame);} return out; }
+function percentile(arr,p){ const a=Array.from(arr).sort((x,y)=>x-y); return a[Math.min(a.length-1,Math.floor(a.length*p))]||0; }
+function trimAndNormalize(x){
+  const fr=Math.round(SR*0.01); const r=rmsFrames(x,fr); if(!r.length) return null;
+  const peak=Math.max(...r), floor=percentile(r,0.1); const th=floor+(peak-floor)*0.08;
+  let a=0,b=r.length-1; while(a<r.length&&r[a]<th)a++; while(b>a&&r[b]<th)b--;
+  if(b<=a||peak<0.003) return null;
+  const s=Math.max(0,(a-2)*fr), e=Math.min(x.length,(b+3)*fr);
+  const y=x.slice(s,e);
+  let ss=0; for(const v of y) ss+=v*v; const rms=Math.sqrt(ss/y.length)||1e-6;
+  let g=0.12/rms; let pk=0; for(const v of y) pk=Math.max(pk,Math.abs(v)); g=Math.min(g,0.95/(pk||1));
+  for(let i=0;i<y.length;i++) y[i]*=g;
+  fade(y,Math.round(SR*0.006));
+  return y;
+}
+function fade(y,n){ n=Math.min(n,Math.floor(y.length/2)); for(let i=0;i<n;i++){const g=i/n; y[i]*=g; y[y.length-1-i]*=g;} }
+function splitSegments(x,want){
+  const fr=Math.round(SR*0.01); const r=rmsFrames(x,fr); if(!r.length) return [];
+  const peak=Math.max(...r), floor=percentile(r,0.1);
+  function regions(frac,gap){
+    const th=floor+(peak-floor)*frac; const regs=[]; let st=-1;
+    for(let i=0;i<r.length;i++){ if(r[i]>=th){ if(st<0)st=i; } else if(st>=0){ regs.push([st,i]); st=-1; } }
+    if(st>=0) regs.push([st,r.length]);
+    const m=[]; for(const g of regs){ if(m.length&&g[0]-m[m.length-1][1]<gap) m[m.length-1][1]=g[1]; else m.push(g.slice()); }
+    return m.filter(g=>g[1]-g[0]>=6);
+  }
+  let best=null;
+  for(const gap of [12,18,25,8,35]) for(const f of [0.08,0.12,0.06,0.16,0.2,0.04,0.25,0.3]){
+    const g=regions(f,gap); if(!best||Math.abs(g.length-want)<Math.abs(best.length-want)) best=g; if(g.length===want) {best=g; break;}
+    if(best.length===want) break;
+  }
+  return best.map(([a,b])=>{ const s=Math.max(0,(a-3)*fr), e=Math.min(x.length,(b+4)*fr); return trimAndNormalize(x.slice(s,e))||x.slice(s,e); });
+}
+function resample(x,ratio){ // output length = x.length/ratio (reads at speed ratio)
+  const n=Math.max(1,Math.floor(x.length/ratio)), y=new Float32Array(n);
+  for(let i=0;i<n;i++){ const p=i*ratio, j=Math.floor(p), f=p-j; const a=x[j]||0, b=x[j+1]||0; y[i]=a+(b-a)*f; }
+  return y;
+}
+function stretch(x,factor){ // WSOLA time stretch, output length ≈ x.length*factor
+  if(Math.abs(factor-1)<0.01) return x.slice();
+  const N=Math.round(SR*0.04)&~1, Hs=N>>1, tol=Math.round(SR*0.008);
+  const Ha=Hs/factor; const outLen=Math.ceil(x.length*factor)+N; const y=new Float32Array(outLen), w=new Float32Array(outLen);
+  const win=new Float32Array(N); for(let i=0;i<N;i++) win[i]=0.5-0.5*Math.cos(2*Math.PI*i/N);
+  let prev=0; let k=0;
+  while(true){
+    const outPos=k*Hs; if(outPos+N>outLen) break; const nominal=Math.round(k*Ha); if(nominal>=x.length) break;
+    let pos=nominal;
+    if(k>0){ const nat=prev+Hs; let best=-Infinity; for(let d=-tol;d<=tol;d+=4){ const c=nominal+d; if(c<0||c+N>x.length) continue; let s=0; for(let j=0;j<Hs;j+=2) s+=x[c+j]*(x[nat+j]||0); if(s>best){best=s;pos=c;} } }
+    for(let j=0;j<N;j++){ const v=x[pos+j]; if(v===undefined) break; y[outPos+j]+=v*win[j]; w[outPos+j]+=win[j]; }
+    prev=pos; k++;
+  }
+  const L=Math.min(outLen,Math.ceil(x.length*factor)); const out=new Float32Array(L);
+  for(let i=0;i<L;i++) out[i]=w[i]>1e-3?y[i]/w[i]:0;
+  return out;
+}
+function pitchSpeed(x,semi,speed){ const p=Math.pow(2,semi/12); const st=stretch(x,p/speed); return Math.abs(p-1)<0.001?st:resample(st,p); }
+
+/* ---------- text -> units ---------- */
+function phraseKeys(){ return [...clips.keys()].filter(k=>clips.get(k).kind==="phrase").sort((a,b)=>b.length-a.length); }
+function tokenize(raw){
+  const s=normalizeText(raw); const toks=[]; const pk=phraseKeys();
+  for(let i=0;i<s.length;){
+    const ch=s[i];
+    const ph=pk.find(p=>s.startsWith(p,i)); if(ph){ toks.push({t:ph,kind:"phrase"}); i+=ph.length; continue; }
+    if(SMALLY[s[i+1]] && /[ぁ-ゖ]/.test(ch)){ toks.push({t:ch+s[i+1],kind:"kana"}); i+=2; continue; }
+    if(ch==="っ"||ch==="ッ"){ toks.push({t:ch,kind:"gap",dur:0.09}); i++; continue; }
+    if(ch==="ー"||ch==="〜"||ch==="~"){ toks.push({t:ch,kind:"long"}); i++; continue; }
+    if(/[、,，]/.test(ch)){ toks.push({t:ch,kind:"gap",dur:0.22}); i++; continue; }
+    if(/[。．.！!？?\n]/.test(ch)){ toks.push({t:ch,kind:"gap",dur:0.42}); i++; continue; }
+    if(/[\s　・「」『』（）()…]/.test(ch)){ toks.push({t:ch,kind:"gap",dur:/\s|　/.test(ch)?0.06:0.12}); i++; continue; }
+    if(/[ぁ-ゖ]/.test(ch)){ toks.push({t:ch,kind:"kana"}); i++; continue; }
+    toks.push({t:ch,kind:"unknown"}); i++;
+  }
+  return toks;
+}
+function getPcm(k){ const c=clips.get(k); return c?c.pcm:null; }
+function resolveKana(u){
+  let p=getPcm(u); if(p) return [p];
+  if(u.length===2){ // youon
+    const head=u[0], tail=SMALLY[u[1]];
+    const h=resolveKana(head), t=getPcm(tail);
+    if(h&&t){ const hp=h[0]; return [hp.slice(0,Math.floor(hp.length*0.5)),t]; }
+    return h||null;
+  }
+  if(ALIAS[u]){ p=getPcm(ALIAS[u]); if(p) return [p]; }
+  if(DAKU[u]){ p=getPcm(DAKU[u]); if(p) return [p]; }
+  if(SMALLY[u]){ p=getPcm(SMALLY[u]); if(p) return [p]; }
+  return null;
+}
+function vowelOf(t){ const last=t[t.length-1]; return VOWEL[last]||VOWEL[ALIAS[last]]||null; }
+
+/* ---------- smoothing: pitch, timing, joins ---------- */
+let clipRev=0;
+const f0Cache=new WeakMap();
+function median(a){ const s=a.slice().sort((x,y)=>x-y); return s.length?s[Math.floor(s.length/2)]:0; }
+function f0Of(x){
+  if(f0Cache.has(x)) return f0Cache.get(x);
+  const d=new Float32Array(Math.floor(x.length/2)); for(let i=0;i<d.length;i++) d[i]=(x[2*i]+x[2*i+1])/2; const R=SR/2; // 12 kHz
+  const N=Math.round(R*0.025), hop=Math.round(R*0.008), minL=Math.floor(R/420), maxL=Math.ceil(R/70); const vals=[];
+  const a=Math.floor(d.length*0.1), b=Math.floor(d.length*0.92)-N-maxL;
+  for(let s=a;s<b;s+=hop){
+    let e0=0; for(let j=0;j<N;j++) e0+=d[s+j]*d[s+j]; if(e0<N*2e-5) continue;
+    const rs=new Float32Array(maxL+1); let best=0;
+    for(let L=minL;L<=maxL;L++){ let c=0,e1=0; for(let j=0;j<N;j++){ const v=d[s+j+L]; c+=d[s+j]*v; e1+=v*v; } const r=c/Math.sqrt(e0*e1+1e-12); rs[L]=r; if(r>best) best=r; }
+    if(best<0.6) continue;
+    let L=minL; for(;L<=maxL;L++) if(rs[L]>=best*0.9&&rs[L]>=rs[L-1]&&rs[L]>=(rs[L+1]||0)) break; // first strong peak avoids octave errors
+    vals.push(R/L);
+  }
+  const v=vals.length>=1?median(vals):0; f0Cache.set(x,v); return v;
+}
+let voiceF0Memo={rev:-1,v:0};
+function voiceF0(){ if(voiceF0Memo.rev===clipRev) return voiceF0Memo.v; const fs=[]; for(const [k,c] of clips){ if(c.kind==="kana"){ const f=f0Of(c.pcm); if(f) fs.push(f); } } voiceF0Memo={rev:clipRev,v:median(fs)}; return voiceF0Memo.v; }
+function moraCount(k){ return moraList(k).length; }
+function ruleContour(n,q){ const out=[]; for(let j=0;j<n;j++) out.push(j===0&&n>1?-0.8:1.2-2.6*(j/Math.max(1,n-1))); if(q&&n){ out[n-1]+=4; if(n>1) out[n-2]+=1; } return out; }
+function localPlan(text){
+  const s=normalizeText(text); const segs=[]; let cur="";
+  const push=(ch)=>{ const q=/[？?]/.test(ch); const pause=/[、,，]/.test(ch)?0.22:0.42; if(cur.trim()) segs.push({kana:cur,pitch:null,rate:1,pause,q}); else if(segs.length){ const l=segs[segs.length-1]; l.pause=Math.max(l.pause,pause); l.q=l.q||q; } cur=""; };
+  for(const ch of s){ if(/[、,，。．.！!？?\n]/.test(ch)) push(ch); else cur+=ch; }
+  if(cur.trim()) segs.push({kana:cur,pitch:null,rate:1,pause:0.3,q:false});
+  return {segments:segs,source:"rule"};
+}
+function joinPlain(bs){ const n=bs.reduce((a,b)=>a+b.length,0), o=new Float32Array(n); let p=0; for(const b of bs){ o.set(b,p); p+=b.length; } return o; }
+function build(plan,opt){
+  const smooth=!opt||opt.smooth!==false; const target=smooth?voiceF0():0; const baseMora=0.13; const rate=clamp((opt&&opt.rate)||1,0.5,3);
+  const units=[]; const missing=[];
+  for(const seg of plan.segments){
+    const toks=tokenize(seg.kana);
+    let nM=0; const tm=toks.map(t=>{ const m=t.kind==="phrase"?moraCount(t.t):(t.kind==="kana"||t.kind==="long"||(t.kind==="gap"&&(t.t==="っ"||t.t==="ッ")))?1:0; const o={start:nM,n:m}; nM+=m; return o; });
+    const contour=(seg.pitch&&seg.pitch.length===nM)?seg.pitch:ruleContour(nM,seg.q);
+    const strength=seg.pitch?1:0.8;
+    let lastIdx=-1; toks.forEach((t,i)=>{ if(t.kind==="kana"||t.kind==="phrase"||t.kind==="long") lastIdx=i; });
+    let lastKana=null;
+    toks.forEach((tk,i)=>{
+      let pcm=null;
+      if(tk.kind==="phrase"){ pcm=getPcm(tk.t); lastKana=tk.t; }
+      else if(tk.kind==="kana"){ const b=resolveKana(tk.t); if(b){ pcm=b.length===1?b[0]:joinPlain(b); lastKana=tk.t; } else missing.push(tk.t); }
+      else if(tk.kind==="long"){ const v=lastKana&&vowelOf(lastKana); const b=v&&getPcm(v); if(b) pcm=b.slice(Math.floor(b.length*0.25)); }
+      else if(tk.kind==="gap"){ units.push({sil:Math.round(SR*(tk.t==="っ"||tk.t==="ッ"?0.06:tk.dur*0.8)/rate),label:tk.t}); return; }
+      else missing.push(tk.t);
+      if(!pcm){ units.push({miss:true,label:tk.t}); return; }
+      const m=tm[i]; let semi=0; if(m.n){ let s=0; for(let j=0;j<m.n;j++) s+=contour[m.start+j]||0; semi=s/m.n*strength; }
+      if(!smooth&&tk.kind==="phrase") semi=0;
+      if(smooth&&target){ const f=f0Of(pcm); if(f) semi+=12*Math.log2(target/f); }
+      semi=Math.max(-8,Math.min(8,semi));
+      let ratio=1/(seg.rate||1);
+      if(smooth&&tk.kind!=="phrase") ratio*=Math.pow(baseMora*(tk.kind==="long"?0.9:1)/(pcm.length/SR),0.65);
+      if(i===lastIdx) ratio*=1.15;
+      if(!smooth&&!seg.pitch&&plan.source==="rule"){ semi=0; ratio=1; }
+      ratio=Math.max(0.3,Math.min(2.2,ratio/rate));
+      const out=(Math.abs(semi)<0.05&&Math.abs(ratio-1)<0.02)?pcm:pitchSpeed(pcm,semi,1/ratio);
+      units.push({pcm:out,label:tk.t});
+    });
+    units.push({sil:Math.round(SR*Math.max(0,Math.min(1,(seg.pause??0.3)*0.85))/rate),label:seg.q?"？":(seg.pause>=0.35?"。":"、")});
+  }
+  const XF=Math.round(SR*(smooth?0.03:0.018)), SEARCH=Math.round(SR*0.005);
+  let total=SR; for(const u of units) total+=u.pcm?u.pcm.length:(u.sil||0);
+  const out=new Float32Array(total); let pos=0, prevSound=false; const marks=[];
+  for(const u of units){
+    if(u.sil!=null){ const s=pos; pos+=u.sil; prevSound=false; marks.push({t:u.label,start:s/SR,end:pos/SR,gap:true}); continue; }
+    if(u.miss){ marks.push({t:u.label,start:pos/SR,end:pos/SR,miss:true}); continue; }
+    const b=u.pcm; const ov=prevSound?Math.min(XF,Math.floor(b.length/3)):0; let st=pos-ov;
+    if(ov&&smooth){ let best=-Infinity,bd=0; for(let d=-SEARCH;d<=SEARCH;d+=2){ const s=st+d; if(s<0) continue; let c=0; for(let j=0;j<ov;j+=2) c+=out[s+j]*b[j]; if(c>best){best=c;bd=d;} } st+=bd; }
+    const prevEnd=pos;
+    for(let i=0;i<b.length;i++){ const k=st+i; if(i<ov){ const t=i/ov; if(k<prevEnd) out[k]*=Math.cos(t*Math.PI/2); out[k]+=b[i]*Math.sin(t*Math.PI/2); } else out[k]+=b[i]; }
+    pos=st+b.length; prevSound=true; marks.push({t:u.label,start:st/SR,end:pos/SR});
+  }
+  return {pcm:out.subarray(0,Math.max(pos,1)),marks,missing:[...new Set(missing)]};
+}
+
+/* ---------- AI agent: reading, phrasing, intonation, pace ---------- */
+const AI_PROMPT=`あなたは日本語の音声合成アプリに常駐する「話し方エージェント」です。録音した1音ずつの声をつないで読み上げるので、自然に聞こえるように読み方・区切り・抑揚・速さを決めてください。
+
+やること:
+1. 入力文を、実際の発音どおりのひらがなにする(漢字・カタカナ・英字・数字・記号もすべて読みに直す。助詞の「は」は「わ」、「へ」は「え」、「を」はそのまま。のばす音は「ー」を使ってよい)。
+2. 息つぎや意味の切れ目でセグメントに分ける(1セグメントはだいたい3〜15モーラ)。
+3. 各セグメントの各モーラに、声の高さを半音で付ける(-4〜+4)。東京式アクセントの高低、文末に向けて少しずつ下がる流れ、疑問文の語尾の上昇、強調を反映する。
+4. セグメントごとの話す速さの倍率 rate(0.8〜1.25)と、後ろの間 pause(秒、0〜0.8)を決める。読点なら0.15〜0.3、文末なら0.35〜0.6が目安。
+5. 疑問なら question を true にする。
+
+モーラの数え方: 拗音(きゃ・しゅ等)は1モーラ、「っ」「ん」「ー」もそれぞれ1モーラ。pitch の要素数は kana のモーラ数と必ず同じにする。
+
+JSONだけを返す。形式:
+{"segments":[{"kana":"きょうわ","pitch":[-1,1,1,0],"rate":1.0,"pause":0.2,"question":false}]}`;
+let sampleP=null;
+function getSample(){ if(!sampleP) sampleP=(window.claude&&window.claude.use)?Promise.resolve(window.claude.use("sample")).catch(()=>null):Promise.resolve(null); return sampleP; }
+const planCache=LS.get("plans",{});
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function validatePlan(j){
+  if(!j||!Array.isArray(j.segments)) return null; const segs=[];
+  for(const s of j.segments){ const k=toHira(String(s.kana||"")).replace(/[^ぁ-ゖー]/g,""); if(!k) continue; const n=moraCount(k);
+    const p=Array.isArray(s.pitch)&&s.pitch.length===n&&s.pitch.every(v=>typeof v==="number"&&isFinite(v))?s.pitch.map(v=>clamp(v,-5,5)):null;
+    segs.push({kana:k,pitch:p,rate:clamp(+s.rate||1,0.75,1.3),pause:clamp(isFinite(+s.pause)?+s.pause:0.25,0,0.9),q:!!s.question}); }
+  return segs.length?{segments:segs,source:"ai"}:null;
+}
+async function aiPlan(text){
+  if(planCache[text]) return planCache[text];
+  const s=await getSample(); if(!s) throw {code:"unavailable"};
+  const j=await Promise.race([s.json(AI_PROMPT+"\n\n入力文:\n"+text,{modelTier:"quick"}),new Promise((_,r)=>setTimeout(()=>r({code:"timeout"}),25000))]);
+  const plan=validatePlan(j); if(!plan) throw {code:"invalid"};
+  planCache[text]=plan; const ks=Object.keys(planCache); if(ks.length>150) delete planCache[ks[0]]; LS.set("plans",planCache);
+  return plan;
+}
+function setAgent(msg,state){ const el=$("aiStatus"); el.textContent=msg; el.dataset.state=state||""; }
+async function getPlan(text){
+  if(!$("aiOn").checked){ setAgent("内蔵ルールで抑揚と間をつけています","rule"); return localPlan(text); }
+  const cached=!!planCache[text];
+  setAgent(cached?"AIエージェント:前に考えた話し方を使います":"AIエージェントが読み方と話し方を考えています…","busy");
+  try{ const p=await aiPlan(text); const n=p.segments.length, withP=p.segments.filter(s=>s.pitch).length;
+    setAgent("AIエージェント:読み「"+p.segments.map(s=>s.kana).join(" ")+"」/ "+n+"区切り・抑揚"+withP+"か所を調整","ai"); return p; }
+  catch(e){
+    const why={unavailable:"AIエージェントはclaude.aiで開いたときに使えます",not_granted:"AIの利用が許可されていません",rate_limited:"AIの利用上限に達しました",timeout:"AIの返事が遅いので",invalid:"AIの答えが読めなかったので"}[e&&e.code]||"AIに接続できなかったので";
+    setAgent(why+"。いまは内蔵ルールで調整しています","rule"); return localPlan(text);
+  }
+}
+
+/* ---------- waveform ---------- */
+function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function prepCanvas(cv){ const dpr=window.devicePixelRatio||1; const w=cv.clientWidth||300, h=cv.clientHeight||90; if(cv.width!==Math.round(w*dpr)||cv.height!==Math.round(h*dpr)){ cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr); } const g=cv.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0); return {g,w,h}; }
+function waveImage(cv,data,marks,timeScale){
+  const {g,w,h}=prepCanvas(cv); g.clearRect(0,0,w,h); g.fillStyle=cssVar("--sunken"); g.fillRect(0,0,w,h);
+  const len=data.length, step=len/w, mid=h/2+6; let peak=0.05; for(let i=0;i<len;i+=3) peak=Math.max(peak,Math.abs(data[i])); const sc=(h/2-12)/peak;
+  if(marks){ g.font="11px "+cssVar("--f-body"); g.textAlign="center";
+    marks.forEach(m=>{ if(m.miss||m.gap) return; const x=m.start*(timeScale||1)*SR/step, x2=m.end*(timeScale||1)*SR/step; g.fillStyle=cssVar("--line"); g.fillRect(Math.round(x),12,1,h-12); g.fillStyle=cssVar("--muted"); if(x2-x>9) g.fillText(m.t,(x+x2)/2,11); }); }
+  g.fillStyle=cssVar("--accent");
+  for(let x=0;x<w;x++){ let mn=0,mx=0; const a=Math.floor(x*step), b=Math.min(len,Math.floor((x+1)*step)); for(let i=a;i<b;i++){ const v=data[i]; if(v<mn) mn=v; if(v>mx) mx=v; } g.fillRect(x,mid-mx*sc,1,Math.max(1,(mx-mn)*sc)); }
+  const snap=document.createElement("canvas"); snap.width=cv.width; snap.height=cv.height; snap.getContext("2d").drawImage(cv,0,0); cv._snap=snap; cv._dur=len/SR;
+}
+function wavePlayhead(cv,t){ if(!cv._snap) return; const {g,w,h}=prepCanvas(cv); g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,cv.width,cv.height); g.drawImage(cv._snap,0,0); const dpr=window.devicePixelRatio||1; g.setTransform(dpr,0,0,dpr,0,0); const x=Math.min(w-1,t/cv._dur*w); g.fillStyle=cssVar("--rec"); g.fillRect(x,0,2,h); }
+const live={peaks:[]};
+function liveWave(block){ const n=Math.floor(block.length/256); for(let i=0;i<n;i++){ let m=0; for(let j=0;j<256;j++){ const v=Math.abs(block[i*256+j]); if(v>m) m=v; } live.peaks.push(m); } const cv=$("recWave"); const {g,w,h}=prepCanvas(cv); if(live.peaks.length>w/3) live.peaks.splice(0,live.peaks.length-Math.floor(w/3));
+  g.clearRect(0,0,w,h); g.fillStyle=cssVar("--sunken"); g.fillRect(0,0,w,h); g.fillStyle=cssVar("--rec"); const mid=h/2; live.peaks.forEach((p,i)=>{ const a=Math.min(h/2-2,p*h*1.2); g.fillRect(i*3,mid-a,2,Math.max(1,a*2)); }); }
+
+/* ---------- effects ---------- */
+const DEF={pitch:0,speed:1,robot:0,robotHz:55,echo:0,echoTime:0.22,reverb:0,phone:0,crunch:0,harmony:0,harmonySemi:-12,dry:0,volume:1};
+const CTRLS=[
+ ["pitch","声の高さ",-12,12,1,v=>(v>0?"+":"")+v],
+ ["speed","テープ速度",0.6,1.8,0.05,v=>v.toFixed(2)+"×"],
+ ["robot","ロボット",0,1,0.05,pct],
+ ["robotHz","ロボの周波数",20,200,1,v=>v+"Hz"],
+ ["echo","エコー",0,0.8,0.05,pct],
+ ["echoTime","エコー間隔",0.06,0.6,0.01,v=>Math.round(v*1000)+"ms"],
+ ["reverb","ホール響き",0,1,0.05,pct],
+ ["phone","電話・無線",0,1,0.05,pct],
+ ["crunch","ガサガサ",0,1,0.05,pct],
+ ["harmony","ハモり",0,1,0.05,pct],
+ ["harmonySemi","ハモりの高さ",-12,12,1,v=>(v>0?"+":"")+v],
+ ["dry","原音をまぜる",0,1,0.05,pct],
+ ["volume","音量",0.2,1.6,0.05,pct],
+];
+function pct(v){return Math.round(v*100)+"%";}
+const PRESETS=[
+ {id:"plain",name:"そのまま",d:"加工なし",p:{}},
+ {id:"robot",name:"ロボット",d:"機械の声",p:{robot:0.85,robotHz:60,crunch:0.15,pitch:-1}},
+ {id:"helium",name:"ヘリウム",d:"高くて速い",p:{pitch:7,speed:1.15}},
+ {id:"boss",name:"低音ボス",d:"太くて低い",p:{pitch:-6,speed:0.92,reverb:0.25}},
+ {id:"radio",name:"無線",d:"ザラッと細い",p:{phone:1,crunch:0.35}},
+ {id:"hall",name:"ホール",d:"広く響く",p:{reverb:0.7,echo:0.15}},
+ {id:"cave",name:"山びこ",d:"くり返す",p:{echo:0.6,echoTime:0.32,reverb:0.2}},
+ {id:"duet",name:"ふたり声",d:"自分と重なる",p:{harmony:0.7,harmonySemi:-5,dry:0}},
+ {id:"alien",name:"宇宙人",d:"ゆがむ高音",p:{pitch:4,robot:0.6,robotHz:140,echo:0.25,echoTime:0.12}},
+ {id:"plus",name:"声にプラス",d:"加工+原音",p:{pitch:-4,robot:0.5,dry:0.7}},
+];
+let talkRate=LS.get("rate",1.4);
+let fx=Object.assign({},DEF,LS.get("fx",{})); let presetId=LS.get("preset","plain");
+
+function impulse(c,sec,decay){ const n=Math.floor(c.sampleRate*sec), b=c.createBuffer(2,n,c.sampleRate); for(let ch=0;ch<2;ch++){const d=b.getChannelData(ch); for(let i=0;i<n;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/n,decay);} return b; }
+function curve(k){ const n=1024,c=new Float32Array(n); for(let i=0;i<n;i++){const x=i*2/n-1; c[i]=(1+k)*x/(1+k*Math.abs(x));} return c; }
+
+async function render(pcm,p){
+  const wet=pitchSpeed(pcm,p.pitch,p.speed);
+  const tail=(p.echo>0||p.reverb>0)?1.8:0.15;
+  const len=Math.ceil(wet.length+SR*tail);
+  const OC=window.OfflineAudioContext||window.webkitOfflineAudioContext;
+  const oc=new OC(1,len,SR);
+  const mk=a=>{const b=oc.createBuffer(1,a.length,SR); b.getChannelData(0).set(a); const s=oc.createBufferSource(); s.buffer=b; return s;};
+  const master=oc.createGain(); master.gain.value=p.volume;
+  const comp=oc.createDynamicsCompressor(); comp.threshold.value=-14; comp.ratio.value=4; master.connect(comp); comp.connect(oc.destination);
+  // processed bus input
+  const bus=oc.createGain();
+  const src=mk(wet); src.connect(bus); src.start();
+  if(p.harmony>0){ const h=mk(pitchSpeed(pcm,p.pitch+p.harmonySemi,p.speed)); const hg=oc.createGain(); hg.gain.value=p.harmony*0.8; h.connect(hg); hg.connect(bus); h.start(); }
+  let node=bus;
+  if(p.crunch>0){ const ws=oc.createWaveShaper(); ws.curve=curve(p.crunch*40); ws.oversample="2x"; const g=oc.createGain(); g.gain.value=1/(1+p.crunch*1.5); node.connect(ws); ws.connect(g); node=g; }
+  if(p.phone>0){
+    const hp=oc.createBiquadFilter(); hp.type="highpass"; hp.frequency.value=80+p.phone*420;
+    const lp=oc.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=12000-p.phone*8800;
+    const pk=oc.createBiquadFilter(); pk.type="peaking"; pk.frequency.value=1800; pk.gain.value=p.phone*8; pk.Q.value=1;
+    node.connect(hp); hp.connect(lp); lp.connect(pk); node=pk;
+  }
+  // robot (ring modulation) blended
+  const out=oc.createGain();
+  if(p.robot>0){
+    const dryR=oc.createGain(); dryR.gain.value=1-p.robot; node.connect(dryR); dryR.connect(out);
+    const ring=oc.createGain(); ring.gain.value=0; const osc=oc.createOscillator(); osc.type="sine"; osc.frequency.value=p.robotHz;
+    const depth=oc.createGain(); depth.gain.value=1.6; osc.connect(depth); depth.connect(ring.gain); osc.start();
+    const rg=oc.createGain(); rg.gain.value=p.robot; node.connect(ring); ring.connect(rg); rg.connect(out);
+  } else node.connect(out);
+  out.connect(master);
+  if(p.echo>0){ const d=oc.createDelay(1.5); d.delayTime.value=p.echoTime; const fb=oc.createGain(); fb.gain.value=p.echo*0.75; const eg=oc.createGain(); eg.gain.value=p.echo; out.connect(d); d.connect(fb); fb.connect(d); d.connect(eg); eg.connect(master); }
+  if(p.reverb>0){ const cv=oc.createConvolver(); cv.buffer=impulse(oc,1.6,2.6); const rg=oc.createGain(); rg.gain.value=p.reverb*0.9; out.connect(cv); cv.connect(rg); rg.connect(master); }
+  if(p.dry>0){ const dsrc=mk(Math.abs(p.speed-1)<0.01?pcm:stretch(pcm,1/p.speed)); const dg=oc.createGain(); dg.gain.value=p.dry; dsrc.connect(dg); dg.connect(master); dsrc.start(); }
+  const buf=await oc.startRendering();
+  return {buf,timeScale:1/p.speed};
+}
+
+/* ---------- playback ---------- */
+let playing=null;
+function stopAll(){ if(playing){ try{playing.src.stop();}catch(e){} cancelAnimationFrame(playing.raf); playing=null; $("monitor").hidden=true; } try{speechSynthesis.cancel();}catch(e){} $("stopBtn").disabled=true; $("speakBtn").disabled=false; }
+let analyser=null, monHide=0;
+function drawScope(t,dur){
+  const cv=$("scope"); const {g,w,h}=prepCanvas(cv); const n=analyser.fftSize, d=new Float32Array(n); analyser.getFloatTimeDomainData(d);
+  g.clearRect(0,0,w,h); g.fillStyle=cssVar("--sunken"); g.fillRect(0,0,w,h);
+  g.fillStyle=cssVar("--line"); g.fillRect(0,0,Math.max(0,Math.min(1,t/dur))*w,h);
+  g.strokeStyle=cssVar("--accent"); g.lineWidth=2; g.beginPath();
+  for(let x=0;x<w;x++){ const v=d[Math.floor(x/w*n)]; const y=h/2-v*h*0.9; x?g.lineTo(x,y):g.moveTo(x,y); } g.stroke();
+  $("monTime").textContent=Math.max(0,t).toFixed(1)+" / "+dur.toFixed(1)+"秒";
+}
+function playBuffer(buf,onTick,onEnd){
+  const c=ctx(); if(!analyser){ analyser=c.createAnalyser(); analyser.fftSize=1024; analyser.connect(c.destination); }
+  const s=c.createBufferSource(); s.buffer=buf; s.connect(analyser); const t0=c.currentTime+0.03; s.start(t0);
+  const st={src:s,raf:0}; playing=st; clearTimeout(monHide); $("monitor").hidden=false;
+  const tick=()=>{ if(playing!==st) return; const t=c.currentTime-t0; drawScope(t,buf.duration); onTick&&onTick(t); st.raf=requestAnimationFrame(tick); }; tick();
+  s.onended=()=>{ if(playing===st){ cancelAnimationFrame(st.raf); playing=null; monHide=setTimeout(()=>$("monitor").hidden=true,500); onEnd&&onEnd(); } };
+}
+function playPcm(pcm){ const c=ctx(); const b=c.createBuffer(1,pcm.length,SR); b.getChannelData(0).set(pcm); stopAll(); playBuffer(b); }
+
+function renderScreen(marks){
+  const sc=$("screen"); sc.textContent="";
+  marks.forEach(m=>{ if(m.gap&&!/[、。？]/.test(m.t)) return; const s=document.createElement("span"); s.textContent=m.t; if(m.miss) s.className="miss"; m.el=s; sc.appendChild(s); });
+}
+let lastRender=null;
+async function synth(text){
+  const key=text+"|"+JSON.stringify(fx)+"|"+clipRev+"|"+$("aiOn").checked+$("smoothOn").checked+"|"+talkRate;
+  if(lastRender&&lastRender.key===key) return lastRender;
+  const plan=await getPlan(text);
+  const b=build(plan,{smooth:$("smoothOn").checked,rate:talkRate});
+  const {buf,timeScale}=await render(b.pcm,fx);
+  lastRender={key,b,buf,timeScale}; return lastRender;
+}
+async function speak(text){
+  text=(text??$("text").value).trim(); if(!text){ toast("しゃべる文字を入力してください"); return; }
+  stopAll(); ctx();
+  const kanaCount=[...clips.values()].filter(c=>c.kind==="kana").length;
+  if(kanaCount===0&&phraseKeys().length===0){ return speakFallback(text); }
+  $("speakBtn").disabled=true;
+  let r; try{ r=await synth(text); } finally{ $("speakBtn").disabled=false; }
+  const {b,buf,timeScale}=r;
+  renderScreen(b.marks);
+  $("speakStatus").textContent=b.missing.length?"まだ録っていない文字は飛ばしました:"+b.missing.join(" "):"";
+  const cv=$("view-fx").hidden?$("wave"):$("fxWave"); cv.hidden=false; waveImage(cv,buf.getChannelData(0),b.marks,timeScale);
+  $("stopBtn").disabled=false;
+  playBuffer(buf,t=>{ wavePlayhead(cv,t); const tt=t/timeScale; b.marks.forEach(m=>{ if(m.miss||!m.el) return; m.el.className=tt>=m.end?"done":(tt>=m.start?"on":""); }); },()=>{ b.marks.forEach(m=>{ if(m.el&&!m.miss) m.el.className="done"; }); waveImage(cv,buf.getChannelData(0),b.marks,timeScale); $("stopBtn").disabled=true; });
+}
+function speakFallback(text){
+  $("speakStatus").textContent="まだ声が登録されていないので、端末の合成音声で読んでいます。";
+  $("screen").textContent=text;
+  try{ const u=new SpeechSynthesisUtterance(text); u.lang="ja-JP"; u.rate=Math.min(2,talkRate*fx.speed); u.pitch=Math.max(0,Math.min(2,1+fx.pitch/12)); u.onend=()=>$("stopBtn").disabled=true; speechSynthesis.speak(u); $("stopBtn").disabled=false; }
+  catch(e){ $("speakStatus").textContent="この端末では合成音声が使えません。「声を登録」で声を録ってください。"; }
+}
+
+/* ---------- WAV / file output ---------- */
+function wav(buf){
+  const d=buf.getChannelData(0), n=d.length, ab=new ArrayBuffer(44+n*2), v=new DataView(ab);
+  const w=(o,s)=>[...s].forEach((c,i)=>v.setUint8(o+i,c.charCodeAt(0)));
+  w(0,"RIFF"); v.setUint32(4,36+n*2,true); w(8,"WAVE"); w(12,"fmt "); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,buf.sampleRate,true); v.setUint32(28,buf.sampleRate*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true); w(36,"data"); v.setUint32(40,n*2,true);
+  for(let i=0;i<n;i++){ const s=Math.max(-1,Math.min(1,d[i])); v.setInt16(44+i*2,s<0?s*0x8000:s*0x7fff,true); }
+  return new Uint8Array(ab);
+}
+async function saveFile(filename,bytes,type){
+  try{
+    if(window.claude&&window.claude.use){ const dl=await window.claude.use("downloads"); if(dl){ await dl.save({filename,data:new Blob([bytes],{type})}); return true; } }
+  }catch(e){ if(e&&e.code&&e.code!=="unavailable"){ toast("保存をやめました"); return false; } }
+  try{ const url=URL.createObjectURL(new Blob([bytes],{type})); const a=document.createElement("a"); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000); return true; }
+  catch(e){ toast("この画面ではファイルを保存できません"); return false; }
+}
+
+/* ---------- reading script (covers every kana) ---------- */
+const SCRIPT={
+ A:["あいさつ を する","けむり と くも","ねこ の しっぽ","ひなた ぼっこ","ふゆ の よる","へや を でる","ほしい もの","ぬれた せなか","そら に みえる","てがみ を よむ","わかめ の みそしる","まめ を にる","ちいさな えき","きんようび","はるの にわ","おにぎり と ろうそく"],
+ B:["げんき な ぞう","ござる ぜんぶ","だいず と ぎんが","ぐらす に ぴざ","べんとう を ぼくが","ぱぴぷぺぽ","じてんしゃ と どうぶつ","ばなな と じゅく","じゃんけん ぎゅうにゅう","きゃべつ と しゃしん","ちゃわん の ちょこ","しゅくだい と きょう","きゅうり と ちゅうい","じょうず な ぎょうざ","びょういん と りょこう","ぎゃく の ひゃく","しょうゆ と りゅう"]
+};
+let scriptSet="A"; let scriptDone=new Set(LS.get("scriptDone",[])); let mode="script"; let lastTake=null;
+function moraList(s){ const out=[]; s=s.replace(/\s/g,""); for(let i=0;i<s.length;){ if(SMALLY[s[i+1]]){ out.push(s[i]+s[i+1]); i+=2; } else { out.push(s[i]); i++; } } return out; }
+function normalizeOnly(y){ let ss=0,pk=0; for(const v of y){ ss+=v*v; pk=Math.max(pk,Math.abs(v)); } const rms=Math.sqrt(ss/y.length)||1e-6; const g=Math.min(0.12/rms,0.95/(pk||1)); for(let i=0;i<y.length;i++) y[i]*=g; fade(y,Math.round(SR*0.006)); return y; }
+/* Japanese is mora-timed: split each spoken word into its moras, snapping cuts to energy dips. */
+function segmentMoras(x,text){
+  const words=text.split(/\s+/).filter(Boolean).map(moraList);
+  const fr=Math.round(SR*0.005); const raw=rmsFrames(x,fr); const r=raw.map((v,i)=>((raw[i-1]??v)+v+(raw[i+1]??v))/3);
+  if(!r.length) return [];
+  const peak=Math.max(...r), floor=percentile(r,0.1), th=floor+(peak-floor)*0.08;
+  const regs=[]; let st=-1;
+  for(let i=0;i<r.length;i++){ if(r[i]>=th){ if(st<0) st=i; } else if(st>=0){ regs.push([st,i]); st=-1; } }
+  if(st>=0) regs.push([st,r.length]);
+  const merged=[]; for(const g of regs){ if(merged.length&&g[0]-merged[merged.length-1][1]<30) merged[merged.length-1][1]=g[1]; else merged.push(g.slice()); }
+  const voiced=merged.filter(g=>g[1]-g[0]>=10); if(!voiced.length) return [];
+  const chunks=voiced.length===words.length?voiced.map((g,i)=>({a:g[0],b:g[1],ms:words[i]})):[{a:voiced[0][0],b:voiced[voiced.length-1][1],ms:words.flat()}];
+  const out=[]; const pad=Math.round(SR*0.012);
+  for(const c of chunks){
+    const n=c.ms.length, L=c.b-c.a, bounds=[c.a];
+    for(let i=1;i<n;i++){ const nom=c.a+L*i/n, w=L/n*0.35; let best=Math.round(nom), bv=Infinity; for(let j=Math.max(bounds[i-1]+3,Math.round(nom-w)); j<=Math.min(c.b-3,Math.round(nom+w)); j++){ if(r[j]<bv){bv=r[j];best=j;} } bounds.push(best); }
+    bounds.push(c.b);
+    c.ms.forEach((m,i)=>{ const s=Math.max(0,bounds[i]*fr-pad), e=Math.min(x.length,bounds[i+1]*fr+pad); if(e-s>SR*0.03) out.push({m,pcm:normalizeOnly(x.slice(s,e)),s,e}); });
+  }
+  return out;
+}
+function learnFrom(pcm,text){
+  const segs=segmentMoras(pcm,text); waveImage($("recWave"),pcm,segs.map(g=>({t:g.m,start:g.s/SR,end:g.e/SR})));
+  let n=0; for(const {m,pcm:p} of segs){ if(m==="っ"||m==="ー"||!ALL_KEYS.includes(m)) continue; const cur=clips.get(m); if(cur&&cur.src==="single") continue; setClip(m,p,"kana","script"); n++; }
+  return n;
+}
+
+/* ---------- recording ---------- */
+let rec=null; let target=null; // target: {type:'script'|'phrase'|'kana'|'row', key, keys}
+async function startRec(){
+  if(!target){ toast("先に録るものを選んでください"); return; }
+  const c=ctx();
+  let stream;
+  try{ stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}}); }
+  catch(e){ const n=$("micNotice"); n.hidden=false; n.textContent="この画面ではマイクが使えません。「音声ファイルから読み込む」から、スマホのボイスメモなどで録った音声を選んでください。"; return; }
+  const srcN=c.createMediaStreamSource(stream); const proc=c.createScriptProcessor(4096,1,1); const chunks=[];
+  const blockSec=4096/c.sampleRate; const vad={noise:[],speech:false,silent:0,total:0};
+  proc.onaudioprocess=e=>{ if(!rec) return; const d=e.inputBuffer.getChannelData(0); chunks.push(new Float32Array(d)); let m=0,ss=0; for(let i=0;i<d.length;i++){ const v=d[i]; ss+=v*v; if(v>m) m=v; } liveWave(d);
+    const rms=Math.sqrt(ss/d.length); vad.total+=blockSec;
+    if(vad.noise.length<3){ vad.noise.push(rms); return; }
+    const th=Math.max(0.012,Math.min(...vad.noise)*3.5);
+    if(rms>th){ vad.speech=true; vad.silent=0; } else if(vad.speech) vad.silent+=blockSec;
+    if(($("autoStop").checked&&vad.speech&&vad.silent>=1.0)||vad.total>20) setTimeout(()=>rec&&rec.proc===proc&&stopRec(),0);
+  };
+  const mute=c.createGain(); mute.gain.value=0; srcN.connect(proc); proc.connect(mute); mute.connect(c.destination);
+  live.peaks=[]; rec={stream,srcN,proc,chunks,rate:c.sampleRate};
+  $("recBtn").textContent="■ 止める"; $("prompt").classList.add("rec"); $("recStatus").textContent="録音中… 読み終わると自動で止まります";
+}
+async function stopRec(){
+  const r=rec; rec=null; r.proc.disconnect(); r.srcN.disconnect(); r.stream.getTracks().forEach(t=>t.stop());
+  $("recBtn").textContent="● 録音"; $("prompt").classList.remove("rec");
+  const total=r.chunks.reduce((a,b)=>a+b.length,0); const all=new Float32Array(total); let o=0; for(const ch of r.chunks){all.set(ch,o);o+=ch.length;}
+  handleAudio(resample(all,r.rate/SR));
+}
+async function decodeFile(file){
+  const ab=await file.arrayBuffer(); const c=ctx();
+  const b=await new Promise((res,rej)=>{ const p=c.decodeAudioData(ab,res,rej); if(p&&p.then) p.then(res,rej); });
+  const mono=new Float32Array(b.length); for(let ch=0;ch<b.numberOfChannels;ch++){ const d=b.getChannelData(ch); for(let i=0;i<d.length;i++) mono[i]+=d[i]/b.numberOfChannels; }
+  return resample(mono,b.sampleRate/SR);
+}
+let pendingSegs=null;
+function handleAudio(pcm){
+  if(!target) return;
+  if(target.type==="row"){ pendingSegs=splitSegments(pcm,target.keys.length); showSegs(); return; }
+  const y=trimAndNormalize(pcm);
+  if(!y){ $("recStatus").textContent="声が小さくて聞き取れませんでした。マイクに近づいてもう一度どうぞ。"; return; }
+  if(target.type==="kana"){
+    setClip(target.key,y,"kana","single"); lastTake={pcm:y,target}; waveImage($("recWave"),y,[{t:target.key,start:0,end:y.length/SR}]); $("recStatus").textContent="「"+target.key+"」を登録しました。";
+    refreshAll(); const i=ALL_KEYS.indexOf(target.key); const nx=ALL_KEYS.slice(i+1).find(k=>!clips.has(k)); if(nx) selectKana(nx); else updateTargetUI(); return;
+  }
+  const key=target.key.replace(/\s/g,"");
+  setClip(key,y,"phrase",target.type==="script"?"script":"user");
+  const n=learnFrom(y,target.key);
+  lastTake={pcm:y,target};
+  $("recStatus").textContent="「"+target.key+"」を登録しました("+n+"文字ぶん)。";
+  if(target.type==="script"){ scriptDone.add(target.key); LS.set("scriptDone",[...scriptDone]); nextPrompt(); }
+  else { $("phraseIn").value=""; target=null; }
+  refreshAll();
+}
+function showSegs(){
+  const box=$("segBox"), list=$("segs"); box.hidden=false; list.textContent="";
+  const keys=target.keys, segs=pendingSegs;
+  $("segInfo").textContent=segs.length===keys.length?"音ごとにタップして確認":("区切りが"+segs.length+"個見つかりました("+keys.length+"個必要)。間をあけて録り直すと合います");
+  segs.forEach((s,i)=>{ const b=document.createElement("button"); b.className="seg"; b.textContent=(keys[i]||"?")+" ▶"; b.onclick=()=>playPcm(s); list.appendChild(b); });
+  $("segSave").disabled=segs.length!==keys.length;
+}
+function nextPrompt(from){
+  const list=SCRIPT[scriptSet]; let i=from??(target&&target.type==="script"?list.indexOf(target.key)+1:0);
+  let k=list.slice(i).find(p=>!scriptDone.has(p))||list.find(p=>!scriptDone.has(p));
+  if(!k&&scriptSet==="A"&&SCRIPT.B.some(p=>!scriptDone.has(p))){ setScriptSet("B"); toast("基本の台本が終わりました。続けて仕上げもどうぞ"); return; }
+  if(!k){ target=null; updateTargetUI(); $("prompt").textContent="ぜんぶ録り終わりました"; $("recTarget").textContent="「しゃべる」で試してみてください。録り直したい言葉はセットを選び直すと出てきます。"; return; }
+  target={type:"script",key:k}; updateTargetUI();
+}
+function setScriptSet(s){ scriptSet=s; $("setA").setAttribute("aria-pressed",String(s==="A")); $("setB").setAttribute("aria-pressed",String(s==="B")); target=null; nextPrompt(0); }
+function setMode(m){
+  mode=m; document.querySelectorAll(".mode").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===m)));
+  $("scriptHead").hidden=m!=="script"; $("phraseHead").hidden=m!=="phrase"; $("segBox").hidden=true; $("recStatus").textContent="";
+  $("recHelp").textContent={script:"表示された言葉を、ふだんの速さではっきり読んでください。言葉と言葉の間を少しあけると、1文字ずつにうまく切り分けられます。基本の16個を読むと、ひらがながひととおりそろいます。",
+    phrase:"よく使う言葉や短い文をひらがなで入れて「決定」、それから録音します。その言葉をしゃべるときは丸ごと使い、含まれている文字も覚えます。",
+    kana:"下の「文字ごとに確認する」を開いて、気になる文字をタップして録り直せます。行の見出しの「行ごと録音」で「か、き、く、け、こ」と区切って一気に録ることもできます。"}[m];
+  if(m==="script") nextPrompt(0);
+  else if(m==="phrase"){ target=null; updateTargetUI(); }
+  else { $("gridBox").open=true; selectKana(ALL_KEYS.find(k=>!clips.has(k))||"あ"); }
+}
+
+/* ---------- UI: kana grid ---------- */
+function buildGrid(){
+  const host=$("kana"); host.textContent="";
+  GROUPS.forEach(g=>{
+    const wrap=document.createElement("div"); wrap.className="kgroup";
+    const h=document.createElement("div"); h.className="kgroup-h";
+    const t=document.createElement("span"); t.textContent=g.name+(g.core?"":"(なくても近い音で代用)"); h.appendChild(t);
+    const rb=document.createElement("button"); rb.className="btn small"; rb.textContent="行ごと録音"; rb.onclick=()=>{ if(mode!=="kana") setMode("kana"); selectRow(g); }; h.appendChild(rb);
+    wrap.appendChild(h);
+    const grid=document.createElement("div"); grid.className="kgrid";
+    g.list.forEach(c=>{ const b=document.createElement("button"); b.className="k"; if(c==="_"){b.classList.add("blank");b.tabIndex=-1;b.setAttribute("aria-hidden","true");} else { b.textContent=c; b.dataset.k=c; b.onclick=()=>{ if(mode!=="kana") setMode("kana"); selectKana(c); window.scrollTo({top:0,behavior:"smooth"}); }; } grid.appendChild(b); });
+    wrap.appendChild(grid); host.appendChild(wrap);
+  });
+}
+function selectKana(k){ target={type:"kana",key:k}; $("segBox").hidden=true; updateTargetUI(); }
+function selectRow(g){ target={type:"row",key:g.name,keys:g.keys}; $("segBox").hidden=true; updateTargetUI(); window.scrollTo({top:0,behavior:"smooth"}); }
+function updateTargetUI(){
+  document.querySelectorAll(".k.sel").forEach(e=>e.classList.remove("sel"));
+  $("playClipBtn").disabled=!lastTake; $("delClipBtn").disabled=!lastTake;
+  $("recBtn").disabled=!target;
+  const cA=SCRIPT.A.filter(p=>scriptDone.has(p)).length, cB=SCRIPT.B.filter(p=>scriptDone.has(p)).length;
+  $("cntA").textContent=cA+"/"+SCRIPT.A.length; $("cntB").textContent=cB+"/"+SCRIPT.B.length;
+  if(!target){ if(mode==="phrase"){ $("prompt").textContent="……"; $("recTarget").textContent="上に言葉を入れて「決定」を押してください"; } return; }
+  if(target.type==="script"){ $("prompt").textContent=target.key; const list=SCRIPT[scriptSet]; $("recTarget").textContent=(list.indexOf(target.key)+1)+" / "+list.length+"  この言葉を読んでください"; }
+  else if(target.type==="kana"){ const el=document.querySelector('.k[data-k="'+target.key+'"]'); el&&el.classList.add("sel"); $("prompt").textContent=target.key; $("recTarget").textContent="この1文字だけを言ってください"; }
+  else if(target.type==="row"){ $("prompt").textContent=target.keys.join("、"); $("recTarget").textContent="一音ずつ間をあけて読んでください"; }
+  else { $("prompt").textContent=target.key; $("recTarget").textContent="この言葉を読んでください"; }
+}
+function refreshAll(){
+  document.querySelectorAll(".k[data-k]").forEach(b=>b.classList.toggle("has",clips.has(b.dataset.k)));
+  const core=CORE_KEYS.filter(k=>clips.has(k)).length, all=ALL_KEYS.filter(k=>clips.has(k)).length;
+  $("progressTxt").textContent="基本 "+core+"/"+CORE_KEYS.length+" ・ 全部 "+all+"/"+ALL_KEYS.length;
+  $("progressBar").style.width=(core/CORE_KEYS.length*100)+"%";
+  const pl=$("phraseList"); pl.textContent="";
+  const mine=phraseKeys().filter(k=>clips.get(k).src!=="script");
+  $("phraseEmpty").hidden=mine.length>0;
+  mine.forEach(k=>{ const b=document.createElement("button"); b.className="chip"; const s=document.createElement("span"); s.textContent="▶ "+k; b.appendChild(s); const x=document.createElement("span"); x.className="x"; x.textContent="✕"; x.setAttribute("aria-label",k+"を削除"); x.onclick=e=>{e.stopPropagation(); delClip(k); refreshAll();}; b.appendChild(x); b.onclick=()=>playPcm(getPcm(k)); pl.appendChild(b); });
+  const vs=$("voiceState");
+  if(core===0&&!phraseKeys().length){ vs.className="notice"; vs.textContent=""; vs.append("まだあなたの声が登録されていません。いまは端末の合成音声で読みます。"); const a=document.createElement("button"); a.className="btn small"; a.style.marginLeft="8px"; a.textContent="声を登録する"; a.onclick=()=>showView("voice"); vs.appendChild(a); }
+  else if(core<CORE_KEYS.length){ vs.className="notice"; vs.textContent="あなたの声で読みます。基本の文字が "+(CORE_KEYS.length-core)+" 個まだです(その音は飛ばします)。"; }
+  else { vs.className="notice ok"; vs.textContent="基本の文字がすべてそろいました。あなたの声で読みます。"; }
+  updateTargetUI();
+}
+
+/* ---------- UI: effects ---------- */
+function buildFx(){
+  const ph=$("presets"); ph.textContent="";
+  PRESETS.forEach(p=>{ const b=document.createElement("button"); b.className="preset"; b.dataset.id=p.id; b.setAttribute("aria-pressed",String(p.id===presetId)); const n=document.createElement("span"); n.textContent=p.name; const s=document.createElement("small"); s.textContent=p.d; b.append(n,s); b.onclick=()=>{ presetId=p.id; fx=Object.assign({},DEF,p.p); saveFx(); syncFx(); speak(); }; ph.appendChild(b); });
+  const host=$("ctrls"); host.textContent="";
+  CTRLS.forEach(([k,label,min,max,step,f])=>{ const row=document.createElement("div"); row.className="ctrl"; const l=document.createElement("label"); l.htmlFor="fx-"+k; l.textContent=label; const i=document.createElement("input"); i.type="range"; i.id="fx-"+k; i.min=min;i.max=max;i.step=step; const o=document.createElement("output"); row.append(l,i,o); host.appendChild(row);
+    i.oninput=()=>{ fx[k]=parseFloat(i.value); o.textContent=f(fx[k]); presetId="custom"; saveFx(); markPreset(); };
+  });
+  syncFx();
+}
+function syncFx(){ CTRLS.forEach(([k,,,,,f])=>{ const i=$("fx-"+k); i.value=fx[k]; i.nextSibling.textContent=f(fx[k]); }); markPreset(); }
+function markPreset(){ document.querySelectorAll(".preset").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.id===presetId))); const p=PRESETS.find(p=>p.id===presetId); $("fxBadge").textContent="加工:"+(p?p.name:"カスタム"); }
+function saveFx(){ LS.set("fx",fx); LS.set("preset",presetId); }
+
+/* ---------- chips ---------- */
+let chips=LS.get("chips",["おはよう","ありがとう","ちょっと まって","それな","なるほど"]);
+function renderChips(){ const h=$("chips"); h.textContent=""; chips.forEach((c,i)=>{ const b=document.createElement("button"); b.className="chip"; b.textContent=c; let timer=null,long=false;
+  b.onpointerdown=()=>{ long=false; timer=setTimeout(()=>{ long=true; chips.splice(i,1); LS.set("chips",chips); renderChips(); toast("「"+c+"」を削除しました"); },650); };
+  b.onpointerup=b.onpointerleave=()=>clearTimeout(timer);
+  b.oncontextmenu=e=>e.preventDefault();
+  b.onclick=()=>{ if(long) return; $("text").value=c; LS.set("text",c); if($("autoSpeak").checked) speak(c); };
+  h.appendChild(b); }); }
+
+/* ---------- kanji reading (kuromoji, lazy) ---------- */
+let tokenizerP=null;
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement("script"); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
+async function getTokenizer(){
+  if(!tokenizerP) tokenizerP=(async()=>{ await loadScript("https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/build/kuromoji.js"); return await new Promise((res,rej)=>window.kuromoji.builder({dicPath:"https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict/"}).build((e,t)=>e?rej(e):res(t))); })();
+  return tokenizerP;
+}
+async function kanjiToKana(){
+  const ta=$("text"); const b=$("kanjiBtn"); b.disabled=true; const old=b.textContent; b.textContent="辞書を読み込み中…";
+  if($("aiOn").checked){ try{ b.textContent="AIが読んでいます…"; const p=await aiPlan(ta.value); const out=p.segments.map((g,i)=>g.kana+(g.q?"？":(i<p.segments.length-1?(g.pause>=0.35?"。":"、"):"。"))).join(""); ta.value=out; LS.set("text",out); toast("よみがなに変換しました"); b.disabled=false; b.textContent=old; return; }catch(e){} }
+  try{
+    const tk=await Promise.race([getTokenizer(),new Promise((_,rej)=>setTimeout(()=>rej(new Error("timeout")),45000))]);
+    const out=tk.tokenize(ta.value).map(t=>{ const s=t.surface_form; if(t.pos==="助詞"&&s==="は") return "わ"; if(t.pos==="助詞"&&s==="へ") return "え"; if(/[一-鿿々]/.test(s)&&t.reading&&t.reading!=="*") return toHira(t.pronunciation&&t.pronunciation!=="*"?t.pronunciation:t.reading); return s; }).join("");
+    ta.value=out; LS.set("text",out); toast("よみがなに変換しました");
+  }catch(e){ tokenizerP=null; toast("この画面では辞書を読み込めませんでした。ひらがなで入力してください"); }
+  b.disabled=false; b.textContent=old;
+}
+
+/* ---------- export / import ---------- */
+function b64(u8){ let s=""; for(let i=0;i<u8.length;i+=0x8000) s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000)); return btoa(s); }
+function unb64(s){ const b=atob(s), u=new Uint8Array(b.length); for(let i=0;i<b.length;i++) u[i]=b.charCodeAt(i); return u; }
+async function exportPack(){
+  if(!clips.size){ toast("まだ声が登録されていません"); return; }
+  const items=[...clips.entries()].map(([k,v])=>{ const i16=new Int16Array(v.pcm.length); for(let i=0;i<i16.length;i++) i16[i]=Math.max(-1,Math.min(1,v.pcm[i]))*32767; return {key:k,kind:v.kind,pcm:b64(new Uint8Array(i16.buffer))}; });
+  const json=JSON.stringify({app:"koeuchi",version:1,sampleRate:SR,clips:items});
+  if(await saveFile("koeuchi-voice.json",new TextEncoder().encode(json),"application/json")) toast("声データを書き出しました");
+}
+async function importPack(file){
+  try{ const j=JSON.parse(await file.text()); if(j.app!=="koeuchi") throw 0; let n=0;
+    for(const it of j.clips){ const u=unb64(it.pcm); const i16=new Int16Array(u.buffer,0,Math.floor(u.length/2)); const f=new Float32Array(i16.length); for(let i=0;i<f.length;i++) f[i]=i16[i]/32767; setClip(it.key,j.sampleRate===SR?f:resample(f,j.sampleRate/SR),it.kind); n++; }
+    refreshAll(); toast(n+"個の声を読み込みました");
+  }catch(e){ toast("コエウチの声データではないようです"); }
+}
+
+/* ---------- views ---------- */
+function showView(v){ ["speak","voice","fx"].forEach(n=>{ $("view-"+n).hidden=n!==v; $("tab-"+n).setAttribute("aria-selected",String(n===v)); }); LS.set("view",v); }
+
+/* ---------- wire up ---------- */
+document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>showView(b.dataset.view));
+$("speakBtn").onclick=()=>speak();
+$("fxTry").onclick=()=>speak();
+$("stopBtn").onclick=stopAll;
+$("clearBtn").onclick=()=>{ $("text").value=""; LS.set("text",""); $("text").focus(); };
+$("text").addEventListener("input",()=>LS.set("text",$("text").value));
+$("text").addEventListener("keydown",e=>{ if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){ e.preventDefault(); speak(); } });
+$("kanjiBtn").onclick=kanjiToKana;
+function setRate(v){ talkRate=clamp(+v,0.6,3); LS.set("rate",talkRate); $("rate").value=talkRate; $("rateOut").textContent=talkRate.toFixed(2)+"×"; document.querySelectorAll("[data-rate]").forEach(b=>b.setAttribute("aria-pressed",String(Math.abs(+b.dataset.rate-talkRate)<0.01))); }
+$("rate").oninput=e=>setRate(e.target.value); $("rate").onchange=()=>{ if(!playing) speak(); };
+document.querySelectorAll("[data-rate]").forEach(b=>b.onclick=()=>{ setRate(b.dataset.rate); speak(); });
+setRate(talkRate);
+["aiOn","smoothOn"].forEach(id=>{ const el=$(id); el.checked=LS.get(id,true); el.onchange=()=>LS.set(id,el.checked); });
+$("saveWavBtn").onclick=async()=>{
+  const text=$("text").value.trim(); if(!text) return toast("しゃべる文字を入力してください");
+  if(!clips.size) return toast("声を登録すると音声を保存できます");
+  const {buf}=await synth(text);
+  if(await saveFile("koeuchi.wav",wav(buf),"audio/wav")) toast("音声を保存しました");
+};
+$("addChip").onclick=()=>{ const t=$("text").value.trim(); if(!t) return; if(!chips.includes(t)){ chips.push(t); LS.set("chips",chips); renderChips(); toast("登録しました"); } };
+$("recBtn").onclick=()=>rec?stopRec():startRec();
+$("playClipBtn").onclick=()=>{ if(lastTake) playPcm(lastTake.pcm); };
+$("delClipBtn").onclick=()=>{ if(!lastTake) return; const t=lastTake.target; if(t.type==="script"){ scriptDone.delete(t.key); LS.set("scriptDone",[...scriptDone]); if(mode!=="script") setMode("script"); } else if(t.type==="phrase"){ if(mode!=="phrase") setMode("phrase"); $("phraseIn").value=t.key; } target=t; lastTake=null; $("recStatus").textContent="もう一度どうぞ。"; updateTargetUI(); };
+document.querySelectorAll(".mode").forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+$("setA").onclick=()=>setScriptSet("A"); $("setB").onclick=()=>setScriptSet("B");
+$("skipBtn").onclick=()=>{ if(target&&target.type==="script"){ const l=SCRIPT[scriptSet]; const i=l.indexOf(target.key); target={type:"script",key:l[(i+1)%l.length]}; updateTargetUI(); } };
+$("fileIn").onchange=async e=>{ const f=e.target.files[0]; e.target.value=""; if(!f) return; if(!target) return toast("先に録るものを選んでください"); try{ handleAudio(await decodeFile(f)); }catch(err){ toast("この音声ファイルは読めませんでした"); } };
+$("segSave").onclick=()=>{ target.keys.forEach((k,i)=>setClip(k,pendingSegs[i],"kana")); $("segBox").hidden=true; toast(target.keys.join("")+" を登録しました"); pendingSegs=null; refreshAll(); };
+$("segCancel").onclick=()=>{ $("segBox").hidden=true; pendingSegs=null; };
+$("phraseSel").onclick=()=>{ const v=normalizeText($("phraseIn").value.trim()).replace(/[、。！？!?,.]/g," ").replace(/\s+/g," ").trim(); if(!v) return toast("言葉をひらがなで入力してください"); if(/[^\u3041-\u3096ー ]/.test(v)) return toast("ひらがなで入力してください(漢字は使えません)"); target={type:"phrase",key:v}; updateTargetUI(); };
+$("exportBtn").onclick=exportPack;
+$("importIn").onchange=e=>{ const f=e.target.files[0]; e.target.value=""; if(f) importPack(f); };
+$("wipeBtn").onclick=()=>$("wipeConfirm").hidden=false;
+$("wipeNo").onclick=()=>$("wipeConfirm").hidden=true;
+$("wipeYes").onclick=()=>{ clips.clear(); clipRev++; dbClear(); $("wipeConfirm").hidden=true; refreshAll(); toast("すべて削除しました"); };
+$("fxReset").onclick=()=>{ fx=Object.assign({},DEF); presetId="plain"; saveFx(); syncFx(); };
+
+buildGrid(); buildFx(); renderChips();
+const savedText=LS.get("text",null); if(savedText) $("text").value=savedText;
+showView(LS.get("view","speak"));
+setMode("script");
+openDB().then(dbAll).then(rows=>{ rows.forEach(([k,v])=>{ if(v&&v.pcm) clips.set(k,v); }); refreshAll(); });
+window.__koeuchi={localPlan,f0Of,voiceF0,validatePlan,clips,build,render,splitSegments,setClip,tokenize,refreshAll,segmentMoras,handleAudio:p=>handleAudio(p),getTarget:()=>target};
+})();
+</script>
+<script>if("serviceWorker" in navigator&&location.protocol==="https:")navigator.serviceWorker.register("sw.js").catch(()=>{});</script></body></html>
